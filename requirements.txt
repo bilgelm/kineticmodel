@@ -1,1 +1,1 @@
-temporalimage
+git+http://github.com/bilgelm/temporalimage
