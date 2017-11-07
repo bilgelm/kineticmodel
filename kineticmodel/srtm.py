@@ -64,7 +64,7 @@ class SRTM_Zhou2003(KineticModel):
         b = linalg.solve(X.T * W * X, X.T * W * y)
         residual = y - X * b
         var_b = residual.T * W * residual / (n-m)
-        
+
         DVR = b[0]
         BP = DVR - 1
 
@@ -87,4 +87,4 @@ class SRTM_Zhou2003(KineticModel):
 
     def refine_R1(smoothb):
         # to be implemented
-        pass
+        raise NotImplementedError()
