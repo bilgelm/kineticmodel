@@ -106,23 +106,27 @@ class SRTM_Lammertsma1996(KineticModel):
     def __init__(self, t, dt, TAC, refTAC, startActivity):
         super().__init__(t, dt, TAC, refTAC, startActivity)
 
+    def srtm_est(self, R1, k2, BPnd):
+        k2a=k2/(BPnd+1)
+        # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
+        # refTAC(t)*exp(k2at).
+        integrant = self.refTAC * exp(k2a*self.t)
+        conv = exp(-k2a*self.t) * km_integrate(integrant,self.t,self.startActivity)
+        return R1*self.refTAC + (k2-R1*k2a)*conv
+
     def fit(self):
         n = len(self.t)
-
-        def srtm_est(self, R1, k2, BPnd):
-
-            k2a=k2/(BPnd+1)
-            # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
-            # refTAC(t)*exp(k2at).
-            integrant = self.refTAC * exp(k2a*self.t)
-            conv = exp(-k2a*self.t) * km_integrate(integrant,self.t,self.startActivity)
-            return R1*self.refTAC + (k2-R1*k2a)*conv
-
-        popt, pcov=curve_fit(srtm_est, self, self.TAC, bounds=(0,[10.,8.,20.]))
-        err = np.sqrt(np.power(self.TAC -srtm_est(self, popt[0], popt[1], popt[2]),2))
-        
+        popt, pcov = curve_fit(self.srtm_est, self, self.TAC, bounds=(0,[10.0,8.0,20.0]))
+        y_est = srtm_est(self, popt[0], popt[1], popt[2])
+        sos=np.sum(np.power(self.TAC-y_est,2))
+        err = np.sqrt(sos)/n
+        mse =  sos / (n-4) # 3 par + std err
+        fpe =  sos * (n+4) / (n-4)
+        SigmaSqr = np.power(np.std( self.TAC-y_est ),2)
+        logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
+        akaike = -2*logl + 2*4 # 4 parameters: 3 model parameters + noise variance
         self.R1 = popt[0]
         self.k2 = popt[1]
         self.BP = popt[2]
         # return self #???
-        return (BP, R1, k2)
+        return (self.BP, self.R1, self.k2)
