@@ -27,15 +27,18 @@ class SRTM_Zhou2003(KineticModel):
     Neuroimage. 2003;18:975–989.
     '''
 
-    '''
-    Args
-    ----
-        smoothTAC : np.array
-            spatially smoothed time activity curve of the region/voxel/vertex
-            of interest (optional - if not provided, [unsmoothed] TAC is used)
-    '''
+
     def __init__(self, t, dt, TAC, refTAC, startActivity,
                  smoothTAC=None):
+        '''
+        Initialize Zhou 2003 SRTM model.
+
+        Args
+        ----
+            smoothTAC : np.array
+                spatially smoothed time activity curve of the region/voxel/vertex
+                of interest (optional - if not provided, [unsmoothed] TAC is used)
+        '''
         super().__init__(t, dt, TAC, refTAC, startActivity)
         self.smoothTAC = smoothTAC
 
@@ -83,8 +86,7 @@ class SRTM_Zhou2003(KineticModel):
         self.BP = BP
         self.R1 = R1
 
-        # return self #???
-        return (BP, R1)
+        return self
 
     def refine_R1(smoothb):
         # to be implemented
@@ -98,35 +100,63 @@ class SRTM_Lammertsma1996(KineticModel):
     Simplified reference tissue model for PET receptor studies.Lammertsma AA1,
     Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.
     '''
-
-    '''
-    Args
-    ----
-    '''
     def __init__(self, t, dt, TAC, refTAC, startActivity):
         super().__init__(t, dt, TAC, refTAC, startActivity)
 
-    def srtm_est(self, R1, k2, BPnd):
-        k2a=k2/(BPnd+1)
-        # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
-        # refTAC(t)*exp(k2at).
-        integrant = self.refTAC * exp(k2a*self.t)
-        conv = exp(-k2a*self.t) * km_integrate(integrant,self.t,self.startActivity)
-        return R1*self.refTAC + (k2-R1*k2a)*conv
-
     def fit(self):
         n = len(self.t)
-        popt, pcov = curve_fit(self.srtm_est, self, self.TAC, bounds=(0,[10.0,8.0,20.0]))
-        y_est = srtm_est(self, popt[0], popt[1], popt[2])
+        m = 4 # 3 model parameters + noise variance
+
+        def make_srtm_est(startActivity):
+            '''
+            Wrapper to construct the SRTM TAC estimation function with a given
+            startActivity.
+            Args
+            ----
+                startActivity : determines initial condition for integration.
+                                See integrate in kineticmodel.py
+            '''
+
+            def srtm_est(X, BPnd, R1, k2):
+                '''
+                Compute fitted TAC given t, refTAC, BP, R1, k2.
+
+                Args
+                ----
+                    X : tuple where first element is t, and second element is intrefTAC
+                    BPnd : binding potential
+                    R1 : R1
+                    k2 : k2
+                '''
+                t, refTAC = X
+
+                k2a=k2/(BPnd+1)
+                # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
+                # refTAC(t)*exp(k2at).
+                integrant = refTAC * np.exp(k2a*t)
+                conv = np.exp(-k2a*t) * km_integrate(integrant,t,startActivity)
+                TAC_est = R1*refTAC + (k2-R1*k2a)*conv
+                return TAC_est
+            return srtm_est
+
+        X = (self.t, self.refTAC)
+        # upper bounds for kinetic parameters in optimization
+        BP_upper, R1_upper, k2_upper = (20.,10.,8.)
+
+        srtm_fun = make_srtm_est(self.startActivity)
+        popt, pcov = curve_fit(srtm_fun, X, self.TAC,
+                               bounds=(0,[BP_upper, R1_upper, k2_upper]))
+        y_est = srtm_fun(X, *popt)
+
         sos=np.sum(np.power(self.TAC-y_est,2))
         err = np.sqrt(sos)/n
-        mse =  sos / (n-4) # 3 par + std err
-        fpe =  sos * (n+4) / (n-4)
-        SigmaSqr = np.power(np.std( self.TAC-y_est ),2)
+        mse =  sos / (n-m) # 3 par + std err
+        fpe =  sos * (n+m) / (n-m)
+
+        SigmaSqr = np.var( self.TAC-y_est )
         logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
-        akaike = -2*logl + 2*4 # 4 parameters: 3 model parameters + noise variance
-        self.R1 = popt[0]
-        self.k2 = popt[1]
-        self.BP = popt[2]
-        # return self #???
-        return (self.BP, self.R1, self.k2)
+        akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
+
+        self.BP, self.R1, self.k2 = popt
+
+        return self
