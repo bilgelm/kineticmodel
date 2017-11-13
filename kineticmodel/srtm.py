@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.matlib as mat
 from scipy import linalg
+from scipy.optimize import curve_fit
 import math
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
@@ -88,3 +89,40 @@ class SRTM_Zhou2003(KineticModel):
     def refine_R1(smoothb):
         # to be implemented
         raise NotImplementedError()
+
+class SRTM_Lammertsma1996(KineticModel):
+    '''
+    Compute binding potential (BP) and relative delivery (R1) kinetic parameters
+    from dynamic PET data based on simplified reference tissue model (SRTM).
+    Reference:
+    Simplified reference tissue model for PET receptor studies.Lammertsma AA1,
+    Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.
+    '''
+
+    '''
+    Args
+    ----
+    '''
+    def __init__(self, t, dt, TAC, refTAC, startActivity):
+        super().__init__(t, dt, TAC, refTAC, startActivity)
+
+    def fit(self):
+        n = len(self.t)
+
+        def srtm_est(self, R1, k2, BPnd):
+
+            k2a=k2/(BPnd+1)
+            # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
+            # refTAC(t)*exp(k2at).
+            integrant = self.refTAC * exp(k2a*self.t)
+            conv = exp(-k2a*self.t) * km_integrate(integrant,self.t,self.startActivity)
+            return R1*self.refTAC + (k2-R1*k2a)*conv
+
+        popt, pcov=curve_fit(srtm_est, self, self.TAC, bounds=(0,[10.,8.,20.]))
+        err = np.sqrt(np.power(self.TAC -srtm_est(self, popt[0], popt[1], popt[2]),2))
+        
+        self.R1 = popt[0]
+        self.k2 = popt[1]
+        self.BP = popt[2]
+        # return self #???
+        return (BP, R1, k2)
