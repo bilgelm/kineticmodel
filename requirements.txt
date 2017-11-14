@@ -1,1 +1,2 @@
+ddt
 git+http://github.com/bilgelm/temporalimage
