@@ -9,7 +9,7 @@ class KineticModel(metaclass=ABCMeta):
     def __init__(self, t, dt, TAC, refTAC,
                  startActivity='flat'):
         '''
-        Abstract method for initializing a kinetic model.
+        Method for initializing a kinetic model.
         Defines required inputs for all kinetic models.
 
         Args
