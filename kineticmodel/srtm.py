@@ -33,37 +33,38 @@ class SRTM_Zhou2003(KineticModel):
             spatially smoothed time activity curve of the region/voxel/vertex
             of interest (optional - if not provided, [unsmoothed] TAC is used)
     '''
-    def __init__(self, t, dt, TAC, refTAC, startActivity,
-                 smoothTAC=None):
+    def __init__(self, t, dt, TAC, refTAC, startActivity):
         super().__init__(t, dt, TAC, refTAC, startActivity)
-        self.smoothTAC = smoothTAC
 
-    def fit(self):
-        n = len(self.t)
-        m = 3
+        # Perform tasks that are independent of the ROI TAC and store the results
 
         # diagonal matrix with diagonal elements corresponding to the duration
         # of each time frame
-        W = mat.diag(self.dt)
+        self.W = mat.diag(self.dt)
+
+        # Numerical integration of reference TAC
+        self.intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
+
+    def _fit_one(self, TAC, smoothTAC=None):
+        n = len(self.t)
+        m = 3
 
         # Numerical integration of target TAC
-        intTAC = km_integrate(self.TAC,self.t,self.startActivity)
-        # Numerical integration of reference TAC
-        intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
+        intTAC = km_integrate(TAC,self.t,self.startActivity)
 
         # ----- Get DVR, BP -----
         # Set up the weighted linear regression model
         # based on Eq. 9 in Zhou et al.
         # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
         # smoothed TAC is used in the design matrix, if provided.
-        if self.smoothTAC is None:
-            X = np.mat(np.column_stack((intrefTAC, self.refTAC, self.TAC)))
-        else:
-            X = np.mat(np.column_stack((intrefTAC, self.refTAC, self.smoothTAC)))
+        if smoothTAC is None:
+            smoothTAC = TAC
+
+        X = np.mat(np.column_stack((self.intrefTAC, self.refTAC, smoothTAC)))
         y = np.mat(intTAC).T
-        b = linalg.solve(X.T * W * X, X.T * W * y)
+        b = linalg.solve(X.T * self.W * X, X.T * self.W * y)
         residual = y - X * b
-        var_b = residual.T * W * residual / (n-m)
+        var_b = residual.T * self.W * residual / (n-m)
 
         DVR = b[0]
         BP = DVR - 1
@@ -71,20 +72,31 @@ class SRTM_Zhou2003(KineticModel):
         # ----- Get R1 -----
         # Set up the weighted linear regression model
         # based on Eq. 8 in Zhou et al.
-        X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
-        y = np.mat(self.TAC).T
-        b = linalg.solve(X.T * W * X, X.T * W * y)
+        X = np.mat(np.column_stack((self.refTAC,self.intrefTAC,-intTAC)))
+        y = np.mat(TAC).T
+        b = linalg.solve(X.T * self.W * X, X.T * self.W * y)
         residual = y - X * b
-        var_b = residual.T * W * residual / (n-m)
+        var_b = residual.T * self.W * residual / (n-m)
 
         R1 = b[0]
 
-        self.BP = BP
-        self.R1 = R1
-
-        # return self #???
         return (BP, R1)
 
-    def refine_R1(smoothb):
+    def _fit_many(self, smoothTAC=None):
+        if smoothTAC is None:
+            # call parent class' implementation of _fit_many
+            return super(SRTM_Zhou2003, self)._fit_many()
+        else:
+            numROIs = self.TAC.shape[0]
+            self.BP = np.zeros(numROIs)
+            self.R1 = np.zeros(numROIs)
+
+            for k in range(numROIs):
+                est = self._fit_one(self.TAC[k,:],smoothTAC=smoothTAC[k,:])
+                self.BP[k], self.R1[k] = est
+
+            return self
+
+    def refine_R1(self, smoothb):
         # to be implemented
         raise NotImplementedError()
