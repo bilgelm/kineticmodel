@@ -1,10 +1,13 @@
 from abc import ABCMeta, abstractmethod
 from scipy import integrate as sp_integrate
+import numpy as np
 
 class KineticModel(metaclass=ABCMeta):
-    @abstractmethod
+    # possible values for startActivity
+    startActivity_values = ('flat','increasing','zero')
+
     def __init__(self, t, dt, TAC, refTAC,
-                 startActivity='increasing'):
+                 startActivity='flat'):
         '''
         Abstract method for initializing a kinetic model.
         Defines required inputs for all kinetic models.
@@ -15,8 +18,9 @@ class KineticModel(metaclass=ABCMeta):
                 time corresponding to each point of the time activity curve (TAC)
             dt : np.array
                 duration of each time frame
-            TAC : np.array
-                time activity curve of the region/voxel/vertex of interest
+            TAC : np.array 1- or 2-D
+                each row is the time activity curve of a region/voxel/vertex of interest
+                if 1-D, can be a column or row vector
             refTAC : np.array
                 time activity curve of the reference region
                 NOTE: maybe this should not be a required input for all
@@ -34,14 +38,32 @@ class KineticModel(metaclass=ABCMeta):
         '''
 
         # basic input checks
-        if not len(t)==len(dt)==len(TAC)==len(refTAC):
-            raise ValueError('KineticModel inputs t, dt, TAC, refTAC must have same length')
+        if not t.ndim==dt.ndim==refTAC.ndim==1:
+            raise ValueError('KineticModel inputs t, dt, refTAC must be 1-D')
+        if not len(t)==len(dt)==len(refTAC):
+            raise ValueError('KineticModel inputs t, dt, refTAC must have same length')
+
+        if TAC.ndim==1:
+            if not len(TAC)==len(t):
+                raise ValueError('KineticModel inputs TAC and t must have same length')
+            # make TAC into a row vector
+            TAC = TAC[np.newaxis,:]
+        elif TAC.ndim==2:
+            if not TAC.shape[1]==len(t):
+                raise ValueError('Number of columns of TAC must be the same \
+                                  as length of t')
+        else:
+            raise ValueError('TAC must be 1- or 2-dimensional')
+
         if not (t[0]>=0):
             raise ValueError('Time of initial frame must be >=0')
         if not _strictly_increasing(t):
             raise ValueError('Time values must be monotonically increasing')
         if not all(dt>0):
             raise ValueError('Time frame durations must be >0')
+
+        if not (startActivity in KineticModel.startActivity_values):
+            raise ValueError('startActivity must be one of: ' + str(KineticModel.startActivity_values))
 
         self.t = t
         self.dt = dt
@@ -53,10 +75,10 @@ class KineticModel(metaclass=ABCMeta):
         self.modelfit = {}
 
         for param_name in self.__class__.param_names:
-            self.params[param_name] = None
+            self.params[param_name] = np.empty(self.TAC.shape[0])
 
         for modelfit_name in self.__class__.modelfit_names:
-            self.modelfit[modelfit_name] = None
+            self.modelfit[modelfit_name] = np.empty(self.TAC.shape[0])
 
     @abstractmethod
     def fit(self):
@@ -67,10 +89,17 @@ class KineticModel(metaclass=ABCMeta):
 def _strictly_increasing(L):
     return all(x<y for x, y in zip(L, L[1:]))
 
-def integrate(TAC, t, startActivity, axis=-1):
+def integrate(TAC, t, startActivity='flat'):
     '''
     Static method to perform time activity curve integration.
     '''
+    if not TAC.ndim==t.ndim==1:
+        raise ValueError('TAC must be 1-dimensional')
+    if not len(t)==len(TAC):
+        raise ValueError('TAC and t must have same length')
+    if not (startActivity in KineticModel.startActivity_values):
+        raise ValueError('startActivity must be one of: ' + str(KineticModel.startActivity_values))
+
     if startActivity=='flat':
         # assume TAC(t)=TAC(t_0) for 0≤t<t_0
         initialIntegralValue = t[0]*TAC[0]
@@ -82,6 +111,6 @@ def integrate(TAC, t, startActivity, axis=-1):
         initialIntegralValue = 0
 
     # Numerical integration of TAC
-    intTAC = sp_integrate.cumtrapz(TAC,t,initial=initialIntegralValue,axis=axis)
+    intTAC = sp_integrate.cumtrapz(TAC,t,initial=initialIntegralValue)
 
     return intTAC

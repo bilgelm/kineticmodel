@@ -44,8 +44,20 @@ class SRTM_Zhou2003(KineticModel):
                 spatially smoothed time activity curve of the region/voxel/vertex
                 of interest (optional - if not provided, [unsmoothed] TAC is used)
         '''
-        super().__init__(t, dt, TAC, refTAC, startActivity)
+        if smoothTAC is not None:
+            if smoothTAC.ndim==1:
+                if not len(smoothTAC)==len(t):
+                    raise ValueError('smoothTAC and t must have same length')
+                # make TAC into a row vector
+                smoothTAC = smoothTAC[np.newaxis,:]
+            elif smoothTAC.ndim==2:
+                if not smoothTAC.shape[1]==len(t):
+                    raise ValueError('Number of columns of smoothTAC must be the same \
+                                      as length of t')
+            else:
+                raise ValueError('smoothTAC must be 1- or 2-dimensional')
 
+        super().__init__(t, dt, TAC, refTAC, startActivity)
         self.smoothTAC = smoothTAC
 
     def fit(self):
@@ -55,42 +67,44 @@ class SRTM_Zhou2003(KineticModel):
         # diagonal matrix with diagonal elements corresponding to the duration
         # of each time frame
         W = mat.diag(self.dt)
-        
+
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
         # Numerical integration of target TAC
-        intTAC = km_integrate(self.TAC,self.t,self.startActivity)
 
-        # ----- Get DVR, BP -----
-        # Set up the weighted linear regression model
-        # based on Eq. 9 in Zhou et al.
-        # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
-        # smoothed TAC is used in the design matrix, if provided.
-        if self.smoothTAC is None:
-            X = np.mat(np.column_stack((intrefTAC, self.refTAC, self.TAC)))
-        else:
-            X = np.mat(np.column_stack((intrefTAC, self.refTAC, self.smoothTAC)))
-        y = np.mat(intTAC).T
-        b = linalg.solve(X.T * W * X, X.T * W * y)
-        residual = y - X * b
-        var_b = residual.T * W * residual / (n-m)
+        for k, TAC in enumerate(self.TAC):
+            intTAC = km_integrate(TAC,self.t,self.startActivity)
 
-        DVR = b[0]
-        BP = DVR - 1
+            # ----- Get DVR, BP -----
+            # Set up the weighted linear regression model
+            # based on Eq. 9 in Zhou et al.
+            # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
+            # smoothed TAC is used in the design matrix, if provided.
+            if self.smoothTAC is None:
+                X = np.mat(np.column_stack((intrefTAC, self.refTAC, TAC)))
+            else:
+                X = np.mat(np.column_stack((intrefTAC, self.refTAC, smoothTAC[k,:].flatten())))
+            y = np.mat(intTAC).T
+            b = linalg.solve(X.T * W * X, X.T * W * y)
+            residual = y - X * b
+            var_b = residual.T * W * residual / (n-m)
 
-        # ----- Get R1 -----
-        # Set up the weighted linear regression model
-        # based on Eq. 8 in Zhou et al.
-        X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
-        y = np.mat(self.TAC).T
-        b = linalg.solve(X.T * W * X, X.T * W * y)
-        residual = y - X * b
-        var_b = residual.T * W * residual / (n-m)
+            DVR = b[0]
+            BP = DVR - 1
 
-        R1 = b[0]
+            # ----- Get R1 -----
+            # Set up the weighted linear regression model
+            # based on Eq. 8 in Zhou et al.
+            X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
+            y = np.mat(TAC).T
+            b = linalg.solve(X.T * W * X, X.T * W * y)
+            residual = y - X * b
+            var_b = residual.T * W * residual / (n-m)
 
-        self.params['BP'] = BP
-        self.params['R1'] = R1
+            R1 = b[0]
+
+            self.params['BP'][k] = BP
+            self.params['R1'][k] = R1
 
         return self
 
@@ -112,9 +126,6 @@ class SRTM_Lammertsma1996(KineticModel):
 
     # This class will provide the following model fit indicators:
     modelfit_names = ['err','mse','fpe','logl','akaike']
-
-    def __init__(self, t, dt, TAC, refTAC, startActivity):
-        super().__init__(t, dt, TAC, refTAC, startActivity)
 
     def fit(self):
         n = len(self.t)
@@ -157,25 +168,27 @@ class SRTM_Lammertsma1996(KineticModel):
         BP_upper, R1_upper, k2_upper = (20.,10.,8.)
 
         srtm_fun = make_srtm_est(self.startActivity)
-        popt, pcov = curve_fit(srtm_fun, X, self.TAC,
-                               bounds=(0,[BP_upper, R1_upper, k2_upper]))
-        y_est = srtm_fun(X, *popt)
 
-        sos=np.sum(np.power(self.TAC-y_est,2))
-        err = np.sqrt(sos)/n
-        mse =  sos / (n-m) # 3 par + std err
-        fpe =  sos * (n+m) / (n-m)
+        for k, TAC in enumerate(self.TAC):
+            popt, pcov = curve_fit(srtm_fun, X, TAC,
+                                   bounds=(0,[BP_upper, R1_upper, k2_upper]))
+            y_est = srtm_fun(X, *popt)
 
-        SigmaSqr = np.var( self.TAC-y_est )
-        logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
-        akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
+            sos=np.sum(np.power(TAC-y_est,2))
+            err = np.sqrt(sos)/n
+            mse =  sos / (n-m) # 3 par + std err
+            fpe =  sos * (n+m) / (n-m)
 
-        self.params['BP'], self.params['R1'], self.params['k2'] = popt
+            SigmaSqr = np.var( TAC-y_est )
+            logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
+            akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
 
-        self.modelfit['err'] = err
-        self.modelfit['mse'] = mse
-        self.modelfit['fpe'] = fpe
-        self.modelfit['logl'] = logl
-        self.modelfit['akaike'] = akaike
+            self.params['BP'][k], self.params['R1'][k], self.params['k2'][k] = popt
+
+            self.modelfit['err'][k] = err
+            self.modelfit['mse'][k] = mse
+            self.modelfit['fpe'][k] = fpe
+            self.modelfit['logl'][k]= logl
+            self.modelfit['akaike'][k] = akaike
 
         return self
