@@ -27,6 +27,11 @@ class SRTM_Zhou2003(KineticModel):
     Neuroimage. 2003;18:975–989.
     '''
 
+    # This class will estimate the following parameters:
+    param_names = ['BP','R1']
+
+    # This class will provide the following model fit indicators:
+    modelfit_names = []
 
     def __init__(self, t, dt, TAC, refTAC, startActivity,
                  smoothTAC=None):
@@ -40,6 +45,7 @@ class SRTM_Zhou2003(KineticModel):
                 of interest (optional - if not provided, [unsmoothed] TAC is used)
         '''
         super().__init__(t, dt, TAC, refTAC, startActivity)
+
         self.smoothTAC = smoothTAC
 
     def fit(self):
@@ -49,11 +55,11 @@ class SRTM_Zhou2003(KineticModel):
         # diagonal matrix with diagonal elements corresponding to the duration
         # of each time frame
         W = mat.diag(self.dt)
-
-        # Numerical integration of target TAC
-        intTAC = km_integrate(self.TAC,self.t,self.startActivity)
+        
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
+        # Numerical integration of target TAC
+        intTAC = km_integrate(self.TAC,self.t,self.startActivity)
 
         # ----- Get DVR, BP -----
         # Set up the weighted linear regression model
@@ -83,8 +89,8 @@ class SRTM_Zhou2003(KineticModel):
 
         R1 = b[0]
 
-        self.BP = BP
-        self.R1 = R1
+        self.params['BP'] = BP
+        self.params['R1'] = R1
 
         return self
 
@@ -100,6 +106,13 @@ class SRTM_Lammertsma1996(KineticModel):
     Simplified reference tissue model for PET receptor studies.Lammertsma AA1,
     Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.
     '''
+
+    # This class will estimate the following parameters:
+    param_names = ['BP','R1','k2']
+
+    # This class will provide the following model fit indicators:
+    modelfit_names = ['err','mse','fpe','logl','akaike']
+
     def __init__(self, t, dt, TAC, refTAC, startActivity):
         super().__init__(t, dt, TAC, refTAC, startActivity)
 
@@ -157,6 +170,12 @@ class SRTM_Lammertsma1996(KineticModel):
         logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
         akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
 
-        self.BP, self.R1, self.k2 = popt
+        self.params['BP'], self.params['R1'], self.params['k2'] = popt
+
+        self.modelfit['err'] = err
+        self.modelfit['mse'] = mse
+        self.modelfit['fpe'] = fpe
+        self.modelfit['logl'] = logl
+        self.modelfit['akaike'] = akaike
 
         return self

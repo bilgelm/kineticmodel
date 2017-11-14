@@ -49,14 +49,25 @@ class KineticModel(metaclass=ABCMeta):
         self.refTAC = refTAC
         self.startActivity = startActivity
 
+        self.params = {}
+        self.modelfit = {}
+
+        for param_name in self.__class__.param_names:
+            self.params[param_name] = None
+
+        for modelfit_name in self.__class__.modelfit_names:
+            self.modelfit[modelfit_name] = None
+
     @abstractmethod
     def fit(self):
-        pass
+        # update self.params
+        # update self.modelfit
+        return self
 
 def _strictly_increasing(L):
     return all(x<y for x, y in zip(L, L[1:]))
 
-def integrate(TAC, t, startActivity):
+def integrate(TAC, t, startActivity, axis=-1):
     '''
     Static method to perform time activity curve integration.
     '''
@@ -71,6 +82,6 @@ def integrate(TAC, t, startActivity):
         initialIntegralValue = 0
 
     # Numerical integration of TAC
-    intTAC = sp_integrate.cumtrapz(TAC,t,initial=initialIntegralValue)
+    intTAC = sp_integrate.cumtrapz(TAC,t,initial=initialIntegralValue,axis=axis)
 
     return intTAC
