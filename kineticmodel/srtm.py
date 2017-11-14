@@ -28,39 +28,26 @@ class SRTM_Zhou2003(KineticModel):
     '''
 
     # This class will estimate the following parameters:
-    param_names = ['BP','R1']
+    param_names = ['BP',
+                   'R1','k2','k2a',
+                   'R1_lrsc','k2_lrsc','k2a_lrsc']
 
     # This class will provide the following model fit indicators:
-    modelfit_names = []
+    modelfit_names = ['noiseVar_eqDVR','noiseVar_eqR1']
 
-    def __init__(self, t, dt, TAC, refTAC, startActivity,
-                 smoothTAC=None):
-        '''
-        Initialize Zhou 2003 SRTM model.
-
-        Args
-        ----
-            smoothTAC : np.array
-                spatially smoothed time activity curve of the region/voxel/vertex
-                of interest (optional - if not provided, [unsmoothed] TAC is used)
-        '''
+    def fit(self, smoothTAC=None):
         if smoothTAC is not None:
             if smoothTAC.ndim==1:
-                if not len(smoothTAC)==len(t):
+                if not len(smoothTAC)==len(self.t):
                     raise ValueError('smoothTAC and t must have same length')
-                # make TAC into a row vector
+                # make smoothTAC into a row vector
                 smoothTAC = smoothTAC[np.newaxis,:]
             elif smoothTAC.ndim==2:
-                if not smoothTAC.shape[1]==len(t):
-                    raise ValueError('Number of columns of smoothTAC must be the same \
-                                      as length of t')
+                if not all(smoothTAC.shape==self.TAC.shape):
+                    raise ValueError('smoothTAC and TAC must have same shape')
             else:
                 raise ValueError('smoothTAC must be 1- or 2-dimensional')
 
-        super().__init__(t, dt, TAC, refTAC, startActivity)
-        self.smoothTAC = smoothTAC
-
-    def fit(self):
         n = len(self.t)
         m = 3
 
@@ -70,9 +57,9 @@ class SRTM_Zhou2003(KineticModel):
 
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
-        # Numerical integration of target TAC
 
         for k, TAC in enumerate(self.TAC):
+            # Numerical integration of target TAC
             intTAC = km_integrate(TAC,self.t,self.startActivity)
 
             # ----- Get DVR, BP -----
@@ -80,16 +67,18 @@ class SRTM_Zhou2003(KineticModel):
             # based on Eq. 9 in Zhou et al.
             # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
             # smoothed TAC is used in the design matrix, if provided.
-            if self.smoothTAC is None:
+            if smoothTAC is None:
                 X = np.mat(np.column_stack((intrefTAC, self.refTAC, TAC)))
             else:
                 X = np.mat(np.column_stack((intrefTAC, self.refTAC, smoothTAC[k,:].flatten())))
             y = np.mat(intTAC).T
             b = linalg.solve(X.T * W * X, X.T * W * y)
             residual = y - X * b
-            var_b = residual.T * W * residual / (n-m)
+            noiseVar_eqDVR = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
 
             DVR = b[0]
+            #R1 = -b[1] / b[2]
+            #k2 = -b[0] / b[2]
             BP = DVR - 1
 
             # ----- Get R1 -----
@@ -99,18 +88,68 @@ class SRTM_Zhou2003(KineticModel):
             y = np.mat(TAC).T
             b = linalg.solve(X.T * W * X, X.T * W * y)
             residual = y - X * b
-            var_b = residual.T * W * residual / (n-m)
+            noiseVar_eqR1 = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
 
             R1 = b[0]
+            k2 = b[1]
+            k2a = -b[2]
 
             self.params['BP'][k] = BP
             self.params['R1'][k] = R1
+            self.params['k2'][k] = k2
+            self.params['k2a'][k] = k2a
+
+            self.modelfit['noiseVar_eqDVR'][k] = noiseVar_eqDVR
+            self.modelfit['noiseVar_eqR1'][k] = noiseVar_eqR1
 
         return self
 
-    def refine_R1(smoothb):
-        # to be implemented
-        raise NotImplementedError()
+    def refine_R1(self, smoothR1, smoothk2, smoothk2a, h):
+        '''
+        Ridge regression to get better R1, k2, k2a estimates
+
+        (smoothR1, smoothk2, smoothk2a) are the values to drive the estimates toward
+        h is the diagonal elements of the matrix used to compute the weighted norm
+        '''
+        if not smoothR1.ndim==smoothk2.ndim==smoothk2a.ndim==1:
+            raise ValueError('smoothR1, smoothk2, smoothk2a must be 1-D')
+        if not len(smoothR1)==len(smoothk2)==len(smoothk2a)==self.TAC.shape[0]:
+            raise ValueError('Length of smoothR1, smoothk2, smoothk2a must be \
+                             equal to the number of rows of TAC')
+        if not h.ndim==2:
+            raise ValueError('h must be 2-D')
+        if not all(h.shape==(self.TAC.shape[0], 3)):
+            raise ValueError('Number of rows of h must equal the number of rows of TAC, \
+                             and the number of columns of h must be 3')
+
+        # diagonal matrix with diagonal elements corresponding to the duration
+        # of each time frame
+        W = mat.diag(self.dt)
+
+        # Numerical integration of reference TAC
+        intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
+        for k, TAC in enumerate(self.TAC):
+            # Numerical integration of target TAC
+            intTAC = km_integrate(TAC,self.t,self.startActivity)
+
+            # ----- Get R1 incorporating spatial constraint -----
+            # Set up the ridge regression model
+            # based on Eq. 11 in Zhou et al.
+            X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
+            y = np.mat(TAC).T
+            H = mat.diag(h[k,:])
+            b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) )
+            b = linalg.solve(X.T * W * X + H, X.T * W * y + H * b_sc)
+
+            R1_lrsc = b[0]
+            k2_lrsc = b[1]
+            k2a_lrsc = -b[2]
+
+            self.params['R1_lrsc'][k] = R1_lrsc
+            self.params['k2_lrsc'][k] = k2_lrsc
+            self.params['k2a_lrsc'][k] = k2a_lrsc
+
+        return self
 
 class SRTM_Lammertsma1996(KineticModel):
     '''

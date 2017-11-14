@@ -81,7 +81,7 @@ class KineticModel(metaclass=ABCMeta):
             self.modelfit[modelfit_name] = np.empty(self.TAC.shape[0])
 
     @abstractmethod
-    def fit(self):
+    def fit(self, **kwargs):
         # update self.params
         # update self.modelfit
         return self
