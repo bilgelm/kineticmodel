@@ -57,7 +57,7 @@ class KineticModel(metaclass=ABCMeta):
 
         if not (t[0]>=0):
             raise ValueError('Time of initial frame must be >=0')
-        if not _strictly_increasing(t):
+        if not strictly_increasing(t):
             raise ValueError('Time values must be monotonically increasing')
         if not all(dt>0):
             raise ValueError('Time frame durations must be >0')
@@ -71,22 +71,30 @@ class KineticModel(metaclass=ABCMeta):
         self.refTAC = refTAC
         self.startActivity = startActivity
 
-        self.params = {}
-        self.modelfit = {}
+        self.results = {}
 
-        for param_name in self.__class__.param_names:
-            self.params[param_name] = np.empty(self.TAC.shape[0])
-
-        for modelfit_name in self.__class__.modelfit_names:
-            self.modelfit[modelfit_name] = np.empty(self.TAC.shape[0])
+        for result_name in self.__class__.result_names:
+            self.results[result_name] = np.empty(self.TAC.shape[0])
+            self.results[result_name].fill(np.nan)
 
     @abstractmethod
     def fit(self, **kwargs):
-        # update self.params
-        # update self.modelfit
+        # update self.results
         return self
 
-def _strictly_increasing(L):
+    def save_result(self, result_name):
+        if not (result_name in self.__class__.result_names):
+            raise ValueError(result_name + ' must be one of ' + self.__class__.result_names)
+
+        result = self.results[result_name]
+
+        # write result to csv file
+        raise NotImplementedError()
+
+def strictly_increasing(L):
+    '''
+    Check if L is a monotonically increasing vector
+    '''
     return all(x<y for x, y in zip(L, L[1:]))
 
 def integrate(TAC, t, startActivity='flat'):

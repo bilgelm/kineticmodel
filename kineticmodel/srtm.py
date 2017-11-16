@@ -1,8 +1,9 @@
+import math
 import numpy as np
 import numpy.matlib as mat
-from scipy import linalg
+from scipy.linalg import solve
+from scipy.ndimage import gaussian_filter
 from scipy.optimize import curve_fit
-import math
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
 
@@ -27,13 +28,13 @@ class SRTM_Zhou2003(KineticModel):
     Neuroimage. 2003;18:975–989.
     '''
 
-    # This class will estimate the following parameters:
-    param_names = ['BP',
-                   'R1','k2','k2a',
-                   'R1_lrsc','k2_lrsc','k2a_lrsc']
-
-    # This class will provide the following model fit indicators:
-    modelfit_names = ['noiseVar_eqDVR','noiseVar_eqR1']
+    # This class will compute the following results:
+    result_names = [ # estimated parameters
+                    'BP',
+                    'R1','k2','k2a',
+                    'R1_lrsc','k2_lrsc','k2a_lrsc',
+                    # model fit indicators
+                    'noiseVar_eqDVR','noiseVar_eqR1']
 
     def fit(self, smoothTAC=None):
         if smoothTAC is not None:
@@ -43,7 +44,7 @@ class SRTM_Zhou2003(KineticModel):
                 # make smoothTAC into a row vector
                 smoothTAC = smoothTAC[np.newaxis,:]
             elif smoothTAC.ndim==2:
-                if not all(smoothTAC.shape==self.TAC.shape):
+                if not smoothTAC.shape==self.TAC.shape:
                     raise ValueError('smoothTAC and TAC must have same shape')
             else:
                 raise ValueError('smoothTAC must be 1- or 2-dimensional')
@@ -58,6 +59,7 @@ class SRTM_Zhou2003(KineticModel):
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
 
+        # Compute BP/DVR, R1, k2, k2a
         for k, TAC in enumerate(self.TAC):
             # Numerical integration of target TAC
             intTAC = km_integrate(TAC,self.t,self.startActivity)
@@ -68,17 +70,18 @@ class SRTM_Zhou2003(KineticModel):
             # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
             # smoothed TAC is used in the design matrix, if provided.
             if smoothTAC is None:
-                X = np.mat(np.column_stack((intrefTAC, self.refTAC, TAC)))
+                X = np.mat(np.column_stack((intrefTAC, self.refTAC, -TAC)))
             else:
-                X = np.mat(np.column_stack((intrefTAC, self.refTAC, smoothTAC[k,:].flatten())))
+                X = np.mat(np.column_stack((intrefTAC, self.refTAC, -smoothTAC[k,:].flatten())))
+
             y = np.mat(intTAC).T
-            b = linalg.solve(X.T * W * X, X.T * W * y)
+            b = solve(X.T * W * X, X.T * W * y)
             residual = y - X * b
             noiseVar_eqDVR = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
 
             DVR = b[0]
-            #R1 = -b[1] / b[2]
-            #k2 = -b[0] / b[2]
+            #R1 = b[1] / b[2]
+            #k2 = b[0] / b[2]
             BP = DVR - 1
 
             # ----- Get R1 -----
@@ -86,31 +89,30 @@ class SRTM_Zhou2003(KineticModel):
             # based on Eq. 8 in Zhou et al.
             X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
             y = np.mat(TAC).T
-            b = linalg.solve(X.T * W * X, X.T * W * y)
+            b = solve(X.T * W * X, X.T * W * y)
             residual = y - X * b
             noiseVar_eqR1 = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
 
             R1 = b[0]
             k2 = b[1]
-            k2a = -b[2]
+            k2a = b[2]
 
-            self.params['BP'][k] = BP
-            self.params['R1'][k] = R1
-            self.params['k2'][k] = k2
-            self.params['k2a'][k] = k2a
+            self.results['BP'][k] = BP # distinguish between BP estimated using smoothed v. unsmoothed TAC?
+            self.results['R1'][k] = R1
+            self.results['k2'][k] = k2
+            self.results['k2a'][k] = k2a
 
-            self.modelfit['noiseVar_eqDVR'][k] = noiseVar_eqDVR
-            self.modelfit['noiseVar_eqR1'][k] = noiseVar_eqR1
+            self.results['noiseVar_eqDVR'][k] = noiseVar_eqDVR
+            self.results['noiseVar_eqR1'][k] = noiseVar_eqR1
 
         return self
 
     def refine_R1(self, smoothR1, smoothk2, smoothk2a, h):
-        '''
-        Ridge regression to get better R1, k2, k2a estimates
+        # Ridge regression to get better R1, k2, k2a estimates
+        #
+        # (smoothR1, smoothk2, smoothk2a) are the values to drive the estimates toward
+        # h is the diagonal elements of the matrix used to compute the weighted norm
 
-        (smoothR1, smoothk2, smoothk2a) are the values to drive the estimates toward
-        h is the diagonal elements of the matrix used to compute the weighted norm
-        '''
         if not smoothR1.ndim==smoothk2.ndim==smoothk2a.ndim==1:
             raise ValueError('smoothR1, smoothk2, smoothk2a must be 1-D')
         if not len(smoothR1)==len(smoothk2)==len(smoothk2a)==self.TAC.shape[0]:
@@ -118,7 +120,7 @@ class SRTM_Zhou2003(KineticModel):
                              equal to the number of rows of TAC')
         if not h.ndim==2:
             raise ValueError('h must be 2-D')
-        if not all(h.shape==(self.TAC.shape[0], 3)):
+        if not h.shape==(self.TAC.shape[0], 3):
             raise ValueError('Number of rows of h must equal the number of rows of TAC, \
                              and the number of columns of h must be 3')
 
@@ -138,16 +140,16 @@ class SRTM_Zhou2003(KineticModel):
             X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
             y = np.mat(TAC).T
             H = mat.diag(h[k,:])
-            b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) )
-            b = linalg.solve(X.T * W * X + H, X.T * W * y + H * b_sc)
+            b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) ).T
+            b = solve(X.T * W * X + H, X.T * W * y + H * b_sc)
 
             R1_lrsc = b[0]
             k2_lrsc = b[1]
-            k2a_lrsc = -b[2]
+            k2a_lrsc = b[2]
 
-            self.params['R1_lrsc'][k] = R1_lrsc
-            self.params['k2_lrsc'][k] = k2_lrsc
-            self.params['k2a_lrsc'][k] = k2a_lrsc
+            self.results['R1_lrsc'][k] = R1_lrsc
+            self.results['k2_lrsc'][k] = k2_lrsc
+            self.results['k2a_lrsc'][k] = k2a_lrsc
 
         return self
 
@@ -160,11 +162,11 @@ class SRTM_Lammertsma1996(KineticModel):
     Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.
     '''
 
-    # This class will estimate the following parameters:
-    param_names = ['BP','R1','k2']
-
-    # This class will provide the following model fit indicators:
-    modelfit_names = ['err','mse','fpe','logl','akaike']
+    # This class will compute the following results:
+    result_names = [ # estimated parameters
+                    'BP','R1','k2',
+                    # model fit indicators
+                    'err','mse','fpe','logl','akaike']
 
     def fit(self):
         n = len(self.t)
@@ -210,7 +212,8 @@ class SRTM_Lammertsma1996(KineticModel):
 
         for k, TAC in enumerate(self.TAC):
             popt, pcov = curve_fit(srtm_fun, X, TAC,
-                                   bounds=(0,[BP_upper, R1_upper, k2_upper]))
+                                   bounds=(0,[BP_upper, R1_upper, k2_upper]),
+                                   sigma=1/np.sqrt(self.dt), absolute_sigma=False)
             y_est = srtm_fun(X, *popt)
 
             sos=np.sum(np.power(TAC-y_est,2))
@@ -222,12 +225,12 @@ class SRTM_Lammertsma1996(KineticModel):
             logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
             akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
 
-            self.params['BP'][k], self.params['R1'][k], self.params['k2'][k] = popt
+            self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = popt
 
-            self.modelfit['err'][k] = err
-            self.modelfit['mse'][k] = mse
-            self.modelfit['fpe'][k] = fpe
-            self.modelfit['logl'][k]= logl
-            self.modelfit['akaike'][k] = akaike
+            self.results['err'][k] = err
+            self.results['mse'][k] = mse
+            self.results['fpe'][k] = fpe
+            self.results['logl'][k]= logl
+            self.results['akaike'][k] = akaike
 
         return self
