@@ -18,10 +18,10 @@ class TestSRTM(unittest.TestCase):
         print('\nFitting SRTM_Zhou2003 with %s start activity' % startActivity)
         self.model.fit()
 
-        print('True BP = %.6f; estimated BP = %.6f; percent error = %.1E' % (BP, self.model.params['BP'], 100*abs(BP-self.model.params['BP'])/BP))
-        print('True R1 = %.6f; estimated R1 = %.6f; percent error = %.1E' % (R1, self.model.params['R1'], 100*abs(R1-self.model.params['R1'])/R1))
-        self.assertAlmostEqual(BP, self.model.params['BP'], delta=1e-3)
-        self.assertAlmostEqual(R1, self.model.params['R1'], delta=5e-2)
+        print('True BP = %.6f; estimated BP = %.6f; percent error = %.1E' % (BP, self.model.results['BP'], 100*abs(BP-self.model.results['BP'])/BP))
+        print('True R1 = %.6f; estimated R1 = %.6f; percent error = %.1E' % (R1, self.model.results['R1'], 100*abs(R1-self.model.results['R1'])/R1))
+        self.assertAlmostEqual(BP, self.model.results['BP'], delta=1e-3)
+        self.assertAlmostEqual(R1, self.model.results['R1'], delta=5e-2)
 
     @unpack
     @data(*iters)
@@ -32,7 +32,7 @@ class TestSRTM(unittest.TestCase):
         print('\nFitting SRTM_Lammertsma1996 with %s start activity' % startActivity)
         self.model.fit()
 
-        print('True BP = %.6f; estimated BP = %.6f; percent error = %.1E' % (BP, self.model.params['BP'], 100*abs(BP-self.model.params['BP'])/BP))
-        print('True R1 = %.6f; estimated R1 = %.6f; percent error = %.1E' % (R1, self.model.params['R1'], 100*abs(R1-self.model.params['R1'])/R1))
-        self.assertAlmostEqual(BP, self.model.params['BP'], delta=5e-2)
-        self.assertAlmostEqual(R1, self.model.params['R1'], delta=5e-1)
+        print('True BP = %.6f; estimated BP = %.6f; percent error = %.1E' % (BP, self.model.results['BP'], 100*abs(BP-self.model.results['BP'])/BP))
+        print('True R1 = %.6f; estimated R1 = %.6f; percent error = %.1E' % (R1, self.model.results['R1'], 100*abs(R1-self.model.results['R1'])/R1))
+        self.assertAlmostEqual(BP, self.model.results['BP'], delta=5e-2)
+        self.assertAlmostEqual(R1, self.model.results['R1'], delta=5e-1)
