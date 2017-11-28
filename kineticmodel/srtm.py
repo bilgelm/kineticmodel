@@ -211,9 +211,12 @@ class SRTM_Lammertsma1996(KineticModel):
         srtm_fun = make_srtm_est(self.startActivity)
 
         for k, TAC in enumerate(self.TAC):
+            # random guess for init
+            p0 = (1+0.1*np.random.randn(3))* np.array([1.0,0.1,2]) # R1, k2, BP0
             popt, pcov = curve_fit(srtm_fun, X, TAC,
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                   sigma=1/np.sqrt(self.dt), absolute_sigma=False)
+                                   sigma=1/np.sqrt(self.dt), absolute_sigma=False,
+                                   p0=p0)
             y_est = srtm_fun(X, *popt)
 
             sos=np.sum(np.power(TAC-y_est,2))

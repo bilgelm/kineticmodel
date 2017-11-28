@@ -16,7 +16,7 @@ from tests.generate_test_data import generate_fakeTAC_SRTM
 # In[3]:
 
 import numpy as np
-np.random.seed(0)
+#np.random.seed(0)
 
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -39,7 +39,7 @@ ax.set_title('Simulated data');
 ax.legend();
 
 
-# In[5]:
+# In[7]:
 
 # Initialize SRTM Lammerstma 1996 model
 mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC)
@@ -51,7 +51,7 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[6]:
+# In[8]:
 
 # Initialize SRTM Zhou 2003 model
 mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC)
@@ -61,7 +61,7 @@ mdl_zhou.fit();
 mdl_zhou.results
 
 
-# In[7]:
+# In[20]:
 
 # Generate noisy simulations by adding normal noise -- I don't think this is a good way
 pct_noise = np.array([0, 5, 10, 15, 20, 25, 30])
@@ -69,7 +69,7 @@ pct_noise = np.array([0, 5, 10, 15, 20, 25, 30])
 TAC_matrix = TAC + np.random.normal(0,np.outer(TAC,pct_noise/100).T)
 
 
-# In[8]:
+# In[21]:
 
 fig, ax = plt.subplots();
 ax.plot(t, TAC_matrix.T, label='');
@@ -83,7 +83,7 @@ ax.legend();
 
 # Experiment using noisy TAC and noiseless reference TAC
 
-# In[9]:
+# In[29]:
 
 # Initialize SRTM Lammerstma 1996 model
 mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC_matrix, refTAC)
@@ -95,7 +95,7 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[10]:
+# In[23]:
 
 # Initialize SRTM Zhou 2003 model
 mdl_zhou = SRTM_Zhou2003(t, dt, TAC_matrix, refTAC)
@@ -105,7 +105,7 @@ mdl_zhou.fit();
 mdl_zhou.results
 
 
-# In[11]:
+# In[24]:
 
 fig, axes = plt.subplots(1,2, figsize=(10,4));
 
@@ -124,7 +124,7 @@ axes[1].set_ylabel('R1');
 axes[1].legend();
 
 
-# In[ ]:
+# In[62]:
 
-
+(1+0.1*np.random.randn(3))* np.array([1.0,0.1,2])
 
