@@ -1,7 +1,8 @@
 
 # coding: utf-8
 
-# In[28]:
+# In[1]:
+
 
 # from https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
 
@@ -10,13 +11,15 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 
-# In[29]:
+# In[2]:
+
 
 def func(x, a, b, c):
      return a * np.exp(-b * x) + c
 
 
-# In[30]:
+# In[3]:
+
 
 xdata = np.linspace(0, 4, 50)
 y = func(xdata, 2.5, 1.3, 0.5)
@@ -26,53 +29,50 @@ ydata = y + y_noise
 plt.plot(xdata, ydata, 'b-', label='data')
 
 
-# In[31]:
+# In[5]:
+
 
 popt, pcov = curve_fit(func, xdata, ydata)
 popt
 
 
-# In[32]:
+# In[6]:
+
 
 plt.plot(xdata, func(xdata, *popt), 'r-', label='fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
 
 
-# In[33]:
+# In[37]:
 
-popt, pcov = curve_fit(func, xdata, ydata, bounds=(0, [3., 1., 0.5]))
+
+popt, pcov = curve_fit(func, xdata, ydata, p0=([10 , 10, 9]))
 popt
 
 
-# In[34]:
+# In[38]:
+
 
 plt.plot(xdata, func(xdata, *popt), 'g--', label='fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
 
 
-# In[35]:
+# In[40]:
 
-popt, pcov = curve_fit(func, xdata, ydata, bounds=(0, [3., 1., 0.5]),p0=([1.0 , 1.0, 0.4]))
+
+popt, pcov = curve_fit(func, xdata, ydata, p0=([2.0 , 1.3, 0.9]))
 popt
 
 
-# In[36]:
-
-plt.plot(xdata, func(xdata, *popt), 'y--', label='fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
+# In[41]:
 
 
-# In[37]:
+plt.plot(xdata, func(xdata, *popt), 'r--', label='fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
+
+
+# In[42]:
+
 
 plt.xlabel('x')
 plt.ylabel('y')
 plt.legend()
 plt.show()
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
 
