@@ -6,8 +6,12 @@ class KineticModel(metaclass=ABCMeta):
     # possible values for startActivity
     startActivity_values = ('flat','increasing','zero')
 
+    # possible values for weights (or a custom vector)
+    weights_values = ('none','frameduration')
+
     def __init__(self, t, dt, TAC, refTAC,
-                 startActivity='flat'):
+                 startActivity='flat'
+                 weights='frameduration'):
         '''
         Method for initializing a kinetic model.
         Defines required inputs for all kinetic models.
@@ -35,6 +39,13 @@ class KineticModel(metaclass=ABCMeta):
                     which results in this integral evaluating to t_0 * TAC(t_0) / 2
                 if 'zero', TAC(t)=0 for 0≤t<t_0, which results in this integral
                     evaluating to 0
+            weights : one of 'none', 'frameduration', or a custom vector
+                equivalent to the precision (inverse of variance) of each time
+                frame; defines how much to weight each time frame in model fitting
+                if 'none', each frame is weighted equally
+                if 'frameduration', frame weight is proportional to frame duration
+                if custom vector, frame weight is proportional to corresponding
+                    vector element
         '''
 
         # basic input checks
@@ -64,6 +75,16 @@ class KineticModel(metaclass=ABCMeta):
 
         if not (startActivity in KineticModel.startActivity_values):
             raise ValueError('startActivity must be one of: ' + str(KineticModel.startActivity_values))
+
+        if weights=='none':
+            self.weights = np.ones_like(t)
+        elif weights=='frameduration':
+            self.weights = dt
+        elif len(weights)==len(t):
+            self.weights = weights
+        else:
+            raise ValueError('weights must be one of: ' + str(KineticModel.weights_values) + \
+                             ' or must be a vector of same length as t')
 
         self.t = t
         self.dt = dt

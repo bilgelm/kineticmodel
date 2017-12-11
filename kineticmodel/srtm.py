@@ -54,7 +54,8 @@ class SRTM_Zhou2003(KineticModel):
 
         # diagonal matrix with diagonal elements corresponding to the duration
         # of each time frame
-        W = mat.diag(self.dt)
+        #W = mat.diag(self.dt)
+        W = mat.diag(self.weights)
 
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
@@ -211,9 +212,12 @@ class SRTM_Lammertsma1996(KineticModel):
         srtm_fun = make_srtm_est(self.startActivity)
 
         for k, TAC in enumerate(self.TAC):
+            #popt, pcov = curve_fit(srtm_fun, X, TAC,
+            #                       bounds=(0,[BP_upper, R1_upper, k2_upper]),
+            #                       sigma=1/np.sqrt(self.dt), absolute_sigma=False)
             popt, pcov = curve_fit(srtm_fun, X, TAC,
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                   sigma=1/np.sqrt(self.dt), absolute_sigma=False)
+                                   sigma=1/np.sqrt(self.weights), absolute_sigma=False)
             y_est = srtm_fun(X, *popt)
 
             sos=np.sum(np.power(TAC-y_est,2))
