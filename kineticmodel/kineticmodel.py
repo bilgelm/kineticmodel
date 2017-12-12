@@ -61,6 +61,8 @@ class KineticModel(metaclass=ABCMeta):
                 if custom vector, frame weight is proportional to corresponding
                     vector element
                 if custom matrix, each TAC can be assigned a different set of weights
+            halflife : required for decay corrected weights. Must be provided in
+                the same units as t and dt.
         '''
 
         # basic input checks
@@ -116,6 +118,10 @@ class KineticModel(metaclass=ABCMeta):
         else:
             raise ValueError('weights must be one of: ' + str(KineticModel.weights_values) + \
                              ' or must be a vector of same length as t')
+
+        if np.any(self.weights<0):
+            warnings.warn('There are negative weights; will replace them with their absolute value')
+            self.weights = np.absolute(self.weights)
         # normalize weights so that they sum to 1
         self.weights = self.weights / np.tile(np.sum(self.weights, axis=1), (1,self.weights.shape[1]))
 
