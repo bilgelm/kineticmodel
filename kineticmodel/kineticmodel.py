@@ -10,7 +10,7 @@ class KineticModel(metaclass=ABCMeta):
     weights_values = ('none','frameduration')
 
     def __init__(self, t, dt, TAC, refTAC,
-                 startActivity='flat'
+                 startActivity='flat',
                  weights='frameduration'):
         '''
         Method for initializing a kinetic model.
