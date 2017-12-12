@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from scipy import integrate as sp_integrate
 import numpy as np
+import warnings
 
 class KineticModel(metaclass=ABCMeta):
     # possible values for startActivity
