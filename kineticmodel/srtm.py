@@ -52,16 +52,13 @@ class SRTM_Zhou2003(KineticModel):
         n = len(self.t)
         m = 3
 
-        # diagonal matrix with diagonal elements corresponding to the duration
-        # of each time frame
-        #W = mat.diag(self.dt)
-        W = mat.diag(self.weights)
-
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
 
         # Compute BP/DVR, R1, k2, k2a
         for k, TAC in enumerate(self.TAC):
+            W = mat.diag(self.weights[k,:])
+
             # Numerical integration of target TAC
             intTAC = km_integrate(TAC,self.t,self.startActivity)
 
@@ -125,13 +122,11 @@ class SRTM_Zhou2003(KineticModel):
             raise ValueError('Number of rows of h must equal the number of rows of TAC, \
                              and the number of columns of h must be 3')
 
-        # diagonal matrix with diagonal elements corresponding to the duration
-        # of each time frame
-        W = mat.diag(self.dt)
-
         # Numerical integration of reference TAC
         intrefTAC = km_integrate(self.refTAC,self.t,self.startActivity)
         for k, TAC in enumerate(self.TAC):
+            W = mat.diag(self.weights[k,:])
+
             # Numerical integration of target TAC
             intTAC = km_integrate(TAC,self.t,self.startActivity)
 
@@ -212,12 +207,9 @@ class SRTM_Lammertsma1996(KineticModel):
         srtm_fun = make_srtm_est(self.startActivity)
 
         for k, TAC in enumerate(self.TAC):
-            #popt, pcov = curve_fit(srtm_fun, X, TAC,
-            #                       bounds=(0,[BP_upper, R1_upper, k2_upper]),
-            #                       sigma=1/np.sqrt(self.dt), absolute_sigma=False)
             popt, pcov = curve_fit(srtm_fun, X, TAC,
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                   sigma=1/np.sqrt(self.weights), absolute_sigma=False)
+                                   sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
             y_est = srtm_fun(X, *popt)
 
             sos=np.sum(np.power(TAC-y_est,2))

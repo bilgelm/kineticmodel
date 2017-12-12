@@ -7,11 +7,15 @@ class KineticModel(metaclass=ABCMeta):
     startActivity_values = ('flat','increasing','zero')
 
     # possible values for weights (or a custom vector)
-    weights_values = ('none','frameduration')
+    weights_values = ('none','frameduration',
+                      'frameduration_activity',
+                      'frameduration_activity_decay')
 
     def __init__(self, t, dt, TAC, refTAC,
                  startActivity='flat',
-                 weights='frameduration'):
+                 weights='frameduration',
+                 halflife=None,
+                 Trues=None):
         '''
         Method for initializing a kinetic model.
         Defines required inputs for all kinetic models.
@@ -39,13 +43,24 @@ class KineticModel(metaclass=ABCMeta):
                     which results in this integral evaluating to t_0 * TAC(t_0) / 2
                 if 'zero', TAC(t)=0 for 0≤t<t_0, which results in this integral
                     evaluating to 0
-            weights : one of 'none', 'frameduration', or a custom vector
+            weights : one of 'none', 'frameduration', 'frameduration_activity',
+                'frameduration_activity_decay', 'trues',
+                or a custom 1- or 2-D np.array
                 equivalent to the precision (inverse of variance) of each time
-                frame; defines how much to weight each time frame in model fitting
+                frame; defines weights for each time frame in model fitting
+                If weights is a vector, its length must be equal to length of t.
+                If weights is a matrix, it must be of the same size as TAC.
                 if 'none', each frame is weighted equally
-                if 'frameduration', frame weight is proportional to frame duration
+                if 'frameduration', frame weight is proportional to dt
+                if 'frameduration_activity', frame weight is proportional to dt / TAC
+                if 'frameduration_activity_decay' (halflife must be specified),
+                    frame weight is proportional to dt / (TAC * exp(decayConstant * t)),
+                    where decayConstant = ln(2) / halflife
+                if 'trues' (halflife and Trues must be specified), frame weight
+                    is proportional to dt^2 / (Trues * exp(decayConstant * t)^2)
                 if custom vector, frame weight is proportional to corresponding
                     vector element
+                if custom matrix, each TAC can be assigned a different set of weights
         '''
 
         # basic input checks
@@ -77,14 +92,32 @@ class KineticModel(metaclass=ABCMeta):
             raise ValueError('startActivity must be one of: ' + str(KineticModel.startActivity_values))
 
         if weights=='none':
-            self.weights = np.ones_like(t)
+            self.weights = np.ones_like(TAC)
         elif weights=='frameduration':
-            self.weights = dt
+            self.weights = np.tile(dt, (TAC.shape[0],1))
+        elif weights=='frameduration_activity':
+            self.weights = dt / TAC
+        elif weights=='frameduration_activity_decay':
+            if halflife is None or halflife<=0:
+                raise ValueError('A valid half life must be specified for decay correction')
+            decayConstant = np.log(2) / halflife
+            self.weights = dt / (TAC * np.exp(decayConstant * t))
+        elif weights=='trues':
+            if halflife is None or halflife<=0:
+                raise ValueError('A valid half life must be specified for decay correction')
+            if Trues is None:
+                raise ValueError('Trues must be specified')
+            decayConstant = np.log(2) / halflife
+            self.weights = np.square(dt) / (Trues * np.square(np.exp(decayConstant * t)))
         elif len(weights)==len(t):
+            self.weights = np.tile(weights, (TAC.shape[0],1))
+        elif weights.shape==TAC.shape:
             self.weights = weights
         else:
             raise ValueError('weights must be one of: ' + str(KineticModel.weights_values) + \
                              ' or must be a vector of same length as t')
+        # normalize weights so that they sum to 1
+        self.weights = self.weights / np.tile(np.sum(self.weights, axis=1), (1,self.weights.shape[1]))
 
         self.t = t
         self.dt = dt
