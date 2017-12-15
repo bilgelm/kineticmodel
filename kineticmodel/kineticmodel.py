@@ -101,6 +101,8 @@ class KineticModel(metaclass=ABCMeta):
         elif weights=='frameduration_activity':
             self.weights = dt / TAC
         elif weights=='frameduration_activity_decay':
+            # used in jip analysis toolkit: http://www.nmr.mgh.harvard.edu/~jbm/jip/jip-srtm/noise-model.html
+            # and in Turku PET Centre's software: http://www.turkupetcentre.net/petanalysis/tpcclib/doc/fvar4dat.html
             if halflife is None or halflife<=0:
                 raise ValueError('A valid half life must be specified for decay correction')
             decayConstant = np.log(2) / halflife
