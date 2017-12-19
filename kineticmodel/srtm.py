@@ -194,6 +194,7 @@ class SRTM_Lammertsma1996(KineticModel):
                 k2a=k2/(BPnd+1)
                 # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
                 # refTAC(t)*exp(k2at).
+
                 integrant = refTAC * np.exp(k2a*t)
                 conv = np.exp(-k2a*t) * km_integrate(integrant,t,startActivity)
                 TAC_est = R1*refTAC + (k2-R1*k2a)*conv
@@ -202,7 +203,7 @@ class SRTM_Lammertsma1996(KineticModel):
 
         X = (self.t, self.refTAC)
         # upper bounds for kinetic parameters in optimization
-        BP_upper, R1_upper, k2_upper = (20.,10.,8.)
+        BP_upper, R1_upper, k2_upper = (20.,10.,2.)
 
         srtm_fun = make_srtm_est(self.startActivity)
 
