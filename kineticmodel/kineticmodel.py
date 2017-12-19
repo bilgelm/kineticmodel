@@ -13,6 +13,7 @@ class KineticModel(metaclass=ABCMeta):
                       'frameduration_activity_decay')
 
     def __init__(self, t, dt, TAC, refTAC,
+                 time_unit,
                  startActivity='flat',
                  weights='frameduration',
                  halflife=None,
@@ -35,6 +36,9 @@ class KineticModel(metaclass=ABCMeta):
                 NOTE: maybe this should not be a required input for all
                       KineticModels -- if there is arterial sampling, then
                       refTAC is not needed.
+            time_unit : one of 's' or 'min'
+                specifies the units of time being supplied
+                t, dt, and halflife must all be supplied in the same unit.
             startActivity : one of 'flat', 'increasing', or 'zero'
                 defines the method for determining the value of the initial
                 integral \int_0^{t_0} TAC(t) dt (default: 'increasing')
@@ -91,30 +95,51 @@ class KineticModel(metaclass=ABCMeta):
         if not all(dt>0):
             raise ValueError('Time frame durations must be >0')
 
+        if time_unit=='s':
+            # convert everything to min
+            t_min = t / 60
+            dt_min = dt / 60
+            if halflife is not None:
+                halflife_min = halflife / 60
+            else:
+                halflife_min = None
+        elif time_unit=='min':
+            t_min = t
+            dt_min = dt
+            halflife_min = halflife
+        else:
+            raise ValueError('units of time must be either s or min')
+
         if not (startActivity in KineticModel.startActivity_values):
             raise ValueError('startActivity must be one of: ' + str(KineticModel.startActivity_values))
+
+        self.t = t_min
+        self.dt = dt_min
+        self.TAC = TAC
+        self.refTAC = refTAC
+        self.startActivity = startActivity
 
         if weights=='none':
             self.weights = np.ones_like(TAC)
         elif weights=='frameduration':
-            self.weights = np.tile(dt, (TAC.shape[0],1))
+            self.weights = np.tile(self.dt, (TAC.shape[0],1))
         elif weights=='frameduration_activity':
-            self.weights = dt / TAC
+            self.weights = self.dt / TAC
         elif weights=='frameduration_activity_decay':
             # used in jip analysis toolkit: http://www.nmr.mgh.harvard.edu/~jbm/jip/jip-srtm/noise-model.html
             # and in Turku PET Centre's software: http://www.turkupetcentre.net/petanalysis/tpcclib/doc/fvar4dat.html
-            if halflife is None or halflife<=0:
+            if halflife_min is None or halflife_min<=0:
                 raise ValueError('A valid half life must be specified for decay correction')
-            decayConstant = np.log(2) / halflife
-            self.weights = dt / (TAC * np.exp(decayConstant * t))
+            decayConstant = np.log(2) / halflife_min
+            self.weights = self.dt / (TAC * np.exp(decayConstant * self.t))
         elif weights=='trues':
-            if halflife is None or halflife<=0:
+            if halflife_min is None or halflife_min<=0:
                 raise ValueError('A valid half life must be specified for decay correction')
             if Trues is None:
                 raise ValueError('Trues must be specified')
-            decayConstant = np.log(2) / halflife
-            self.weights = np.square(dt) / (Trues * np.square(np.exp(decayConstant * t)))
-        elif len(weights)==len(t):
+            decayConstant = np.log(2) / halflife_min
+            self.weights = np.square(self.dt) / (Trues * np.square(np.exp(decayConstant * self.t)))
+        elif len(weights)==len(self.t):
             self.weights = np.tile(weights, (TAC.shape[0],1))
         elif weights.shape==TAC.shape:
             self.weights = weights
@@ -126,13 +151,8 @@ class KineticModel(metaclass=ABCMeta):
             warnings.warn('There are negative weights; will replace them with their absolute value')
             self.weights = np.absolute(self.weights)
         # normalize weights so that they sum to 1
-        self.weights = self.weights / np.tile(np.sum(self.weights, axis=1), (1,self.weights.shape[1]))
-
-        self.t = t
-        self.dt = dt
-        self.TAC = TAC
-        self.refTAC = refTAC
-        self.startActivity = startActivity
+        self.weights = self.weights / np.tile(np.sum(self.weights, axis=1).reshape(-1,1),
+                                              (1,self.weights.shape[1]))
 
         self.results = {}
 

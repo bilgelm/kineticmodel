@@ -13,7 +13,8 @@ class TestSRTM(unittest.TestCase):
     @data(*iters)
     def test_srtm_zhou2003_fit(self, BP, R1, startActivity):
         self.t, self.dt, self.TAC, self.refTAC = generate_fakeTAC_SRTM(BP, R1)
-        self.model = SRTM_Zhou2003(self.t, self.dt, self.TAC, self.refTAC, startActivity)
+        self.model = SRTM_Zhou2003(self.t, self.dt, self.TAC, self.refTAC,
+                                   time_unit='min', startActivity=startActivity)
 
         print('\nFitting SRTM_Zhou2003 with %s start activity' % startActivity)
         self.model.fit()
@@ -27,7 +28,8 @@ class TestSRTM(unittest.TestCase):
     @data(*iters)
     def test_srtm_lammertsma(self, BP, R1, startActivity):
         self.t, self.dt, self.TAC, self.refTAC = generate_fakeTAC_SRTM(BP, R1)
-        self.model = SRTM_Lammertsma1996(self.t, self.dt, self.TAC, self.refTAC, startActivity)
+        self.model = SRTM_Lammertsma1996(self.t, self.dt, self.TAC, self.refTAC,
+                                         time_unit='min', startActivity=startActivity)
 
         print('\nFitting SRTM_Lammertsma1996 with %s start activity' % startActivity)
         self.model.fit()
