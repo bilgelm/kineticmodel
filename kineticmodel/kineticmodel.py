@@ -15,9 +15,9 @@ class KineticModel(metaclass=ABCMeta):
         Args
         ----
             t : np.array
-                time corresponding to each point of the time activity curve (TAC)
+                time corresponding to each point of the time activity curve (TAC)in [seconds]
             dt : np.array
-                duration of each time frame
+                duration of each time frame in [seconds]
             TAC : np.array 1- or 2-D
                 each row is the time activity curve of a region/voxel/vertex of interest
                 if 1-D, can be a column or row vector
