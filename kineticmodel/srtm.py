@@ -194,7 +194,6 @@ class SRTM_Lammertsma1996(KineticModel):
                     k2 : k2
                 '''
                 t, refTAC = X
-                t = t/60 # This is done in order to get the time in the unit of minutes for the subsequent curve_fit to work
 
                 k2a=k2/(BPnd+1)
                 # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
