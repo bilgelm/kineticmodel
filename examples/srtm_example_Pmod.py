@@ -3,14 +3,12 @@
 
 # In[1]:
 
-
 get_ipython().magic('load_ext autoreload')
 get_ipython().magic('autoreload 2')
 from kineticmodel import SRTM_Zhou2003, SRTM_Lammertsma1996
 
 
 # In[2]:
-
 
 import numpy as np
 #np.random.seed(0)
@@ -22,7 +20,6 @@ import pandas as pd
 
 
 # In[3]:
-
 
 table=pd.read_table('SB086-nonPVE.txt')
 table.columns
@@ -44,9 +41,9 @@ ax.legend();
 
 # In[4]:
 
-
 # Initialize SRTM Lammerstma 1996 model
-mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC, time_unit='s')
+mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC)
+# note that we need to give time t and midtime dt in units of minutes!!! Will add that to srtm code
 
 # fit model
 mdl_lammertsma.fit();
@@ -57,9 +54,8 @@ mdl_lammertsma.results
 
 # In[5]:
 
-
 # Initialize SRTM Zhou 2003 model
-mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC, time_unit='s')
+mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC)
 
 mdl_zhou.fit();
 

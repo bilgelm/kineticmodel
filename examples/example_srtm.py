@@ -3,20 +3,23 @@
 
 # In[1]:
 
-
-from kineticmodel import SRTM_Zhou2003, SRTM_Lammertsma1996
+get_ipython().magic('load_ext autoreload')
+get_ipython().magic('autoreload 2')
 
 
 # In[2]:
 
+from kineticmodel import SRTM_Zhou2003, SRTM_Lammertsma1996
+
+
+# In[3]:
 
 import sys, os
 sys.path.insert(0,os.pardir)
 from tests.generate_test_data import generate_fakeTAC_SRTM
 
 
-# In[3]:
-
+# In[4]:
 
 import numpy as np
 np.random.seed(0)
@@ -26,8 +29,7 @@ import matplotlib.pyplot as plt
 get_ipython().magic('matplotlib inline')
 
 
-# In[4]:
-
+# In[5]:
 
 # generate noiseless fake data based on SRTM
 BP = 0.5
@@ -43,11 +45,10 @@ ax.set_title('Simulated data');
 ax.legend();
 
 
-# In[5]:
-
+# In[6]:
 
 # Initialize SRTM Lammerstma 1996 model
-mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC, time_unit='min')
+mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC)
 
 # fit model
 mdl_lammertsma.fit();
@@ -56,19 +57,17 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[6]:
-
+# In[7]:
 
 # Initialize SRTM Zhou 2003 model
-mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC, time_unit='min')
+mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC)
 
 mdl_zhou.fit();
 
 mdl_zhou.results
 
 
-# In[7]:
-
+# In[8]:
 
 # Generate noisy simulations by adding normal noise -- I don't think this is a good way
 pct_noise = np.array([0, 5, 10, 15, 20, 25, 30])
@@ -76,8 +75,7 @@ pct_noise = np.array([0, 5, 10, 15, 20, 25, 30])
 TAC_matrix = TAC + np.random.normal(0,np.outer(TAC,pct_noise/100).T)
 
 
-# In[8]:
-
+# In[9]:
 
 fig, ax = plt.subplots();
 ax.plot(t, TAC_matrix.T, label='');
@@ -91,11 +89,10 @@ ax.legend();
 
 # Experiment using noisy TAC and noiseless reference TAC
 
-# In[9]:
-
+# In[10]:
 
 # Initialize SRTM Lammerstma 1996 model
-mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC_matrix, refTAC, time_unit='min')
+mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC_matrix, refTAC)
 
 # fit model
 mdl_lammertsma.fit();
@@ -104,19 +101,17 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[10]:
-
+# In[11]:
 
 # Initialize SRTM Zhou 2003 model
-mdl_zhou = SRTM_Zhou2003(t, dt, TAC_matrix, refTAC, time_unit='min')
+mdl_zhou = SRTM_Zhou2003(t, dt, TAC_matrix, refTAC)
 
 mdl_zhou.fit();
 
 mdl_zhou.results
 
 
-# In[11]:
-
+# In[12]:
 
 fig, axes = plt.subplots(1,2, figsize=(10,4));
 
