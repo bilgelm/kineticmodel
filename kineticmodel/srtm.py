@@ -1,4 +1,4 @@
-import math
+﻿import math
 import numpy as np
 import numpy.matlib as mat
 from scipy.linalg import solve
@@ -212,6 +212,27 @@ class SRTM_Lammertsma1996(KineticModel):
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
                                    sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
             y_est = srtm_fun(X, *popt)
+
+
+            # random guess for init
+            iter = 10;
+            popt_list = np.zeros([iter,3])
+            mse_list = np.zeros([iter])
+            for i in range(iter):
+                p0 = (1+0.1*np.random.randn(3))* np.array([2.0,1.0,0.1]) # BP, R1, k2
+                popt,pcov = curve_fit(srtm_fun, X, TAC,
+                                       bounds=(0,[BP_upper, R1_upper, k2_upper]),
+                                       sigma=1/np.sqrt(self.dt), absolute_sigma=False,
+                                       p0=p0)
+                popt_list[i,] = popt
+                y_est = srtm_fun(X, *popt)
+                sos=np.sum(np.power(TAC-y_est,2))
+                mse_list[i] =  sos / (n-m) # 3 par + std err
+
+            min_index = np.argmin(mse_list)
+            popt_final = popt_list[min_index,]
+
+            y_est = srtm_fun(X, *popt_final)
 
             sos=np.sum(np.power(TAC-y_est,2))
             err = np.sqrt(sos)/n
