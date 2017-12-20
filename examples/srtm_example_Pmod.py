@@ -39,11 +39,10 @@ ax.set_title('Real PET data');
 ax.legend();
 
 
-# In[4]:
+# In[6]:
 
 # Initialize SRTM Lammerstma 1996 model
-mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC)
-# note that we need to give time t and midtime dt in units of minutes!!! Will add that to srtm code
+mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC, time_unit='s')
 
 # fit model
 mdl_lammertsma.fit();
@@ -52,10 +51,10 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[5]:
+# In[7]:
 
 # Initialize SRTM Zhou 2003 model
-mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC)
+mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC, time_unit='s')
 
 mdl_zhou.fit();
 

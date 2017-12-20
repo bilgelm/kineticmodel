@@ -3,12 +3,10 @@
 
 # In[1]:
 
-
 from kineticmodel import SRTM_Zhou2003, SRTM_Lammertsma1996
 
 
 # In[2]:
-
 
 import sys, os
 sys.path.insert(0,os.pardir)
@@ -16,7 +14,6 @@ from tests.generate_test_data import generate_fakeTAC_SRTM
 
 
 # In[3]:
-
 
 import numpy as np
 np.random.seed(0)
@@ -27,7 +24,6 @@ get_ipython().magic('matplotlib inline')
 
 
 # In[4]:
-
 
 # generate noiseless fake data based on SRTM
 BP = 0.5
@@ -47,7 +43,6 @@ ax.legend();
 
 # In[5]:
 
-
 # Generate "image" data
 # Assume that entire "image" corresponds to a region with uniform BP and R1 values
 
@@ -62,7 +57,6 @@ TAC_matrix = TAC + np.random.normal(0,np.outer(TAC,np.repeat(pct_noise, numVoxel
 
 # In[6]:
 
-
 fig, ax = plt.subplots();
 ax.plot(t, TAC_matrix.T, label='');
 ax.plot(t, TAC, 'k-', label='TAC');
@@ -75,7 +69,6 @@ ax.legend();
 
 # In[7]:
 
-
 # Initialize SRTM Lammerstma 1996 model
 mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC_matrix, refTAC, time_unit='min')
 
@@ -85,7 +78,6 @@ mdl_lammertsma.fit();
 
 # In[8]:
 
-
 # Initialize SRTM Zhou 2003 model
 mdl_zhou = SRTM_Zhou2003(t, dt, TAC_matrix, refTAC, time_unit='min')
 
@@ -93,7 +85,6 @@ mdl_zhou.fit();
 
 
 # In[9]:
-
 
 # we now take advantage of the spatial constraint capabilities of Zhou model
 
@@ -143,7 +134,6 @@ mdl_zhou_spatial_constraint.refine_R1(smooth_R1,smooth_k2,smooth_k2a,h)
 
 
 # In[10]:
-
 
 fig, axes = plt.subplots(1,2, figsize=(10,4));
 
