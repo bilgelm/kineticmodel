@@ -45,11 +45,8 @@ jobs:
           command: |
             . venv/bin/activate
             coverage run setup.py test
+            bash <(curl -s https://codecov.io/bash)
 
       - store_artifacts:
           path: test-reports
           destination: test-reports
-
-  test:
-    post:
-      - bash <(curl -s https://codecov.io/bash)
