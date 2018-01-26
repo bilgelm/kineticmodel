@@ -49,7 +49,3 @@ jobs:
       - store_artifacts:
           path: test-reports
           destination: test-reports
-
-  test:
-    post:
-      - bash <(curl -s https://codecov.io/bash)
