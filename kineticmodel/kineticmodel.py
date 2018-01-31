@@ -253,23 +253,19 @@ class KineticModel(metaclass=ABCMeta):
             km.fit(smoothTAC=smoothTAC)
 
             # Refine R1
-            R1_wlr_flat = np.empty(ti.get_numVoxels())
-            R1_wlr_flat.fill(np.nan)
+            R1_wlr_flat = np.zeros(ti.get_numVoxels())
             R1_wlr_flat[mask] = km.results['R1']
             R1_wlr = np.reshape(R1_wlr_flat, img_dat.shape[:-1])
 
-            k2_wlr_flat = np.empty(ti.get_numVoxels())
-            k2_wlr_flat.fill(np.nan)
+            k2_wlr_flat = np.zeros(ti.get_numVoxels())
             k2_wlr_flat[mask] = km.results['k2']
             k2_wlr = np.reshape(k2_wlr_flat, img_dat.shape[:-1])
 
-            k2a_wlr_flat = np.empty(ti.get_numVoxels())
-            k2a_wlr_flat.fill(np.nan)
+            k2a_wlr_flat = np.zeros(ti.get_numVoxels())
             k2a_wlr_flat[mask] = km.results['k2a']
             k2a_wlr = np.reshape(k2a_wlr_flat, img_dat.shape[:-1])
 
-            noiseVar_eqR1_flat = np.empty(ti.get_numVoxels())
-            noiseVar_eqR1_flat.fill(np.nan)
+            noiseVar_eqR1_flat = np.zeros(ti.get_numVoxels())
             noiseVar_eqR1_flat[mask] = km.results['noiseVar_eqR1']
             noiseVar_eqR1_wlr = np.reshape(noiseVar_eqR1_flat, img_dat.shape[:-1])
 
