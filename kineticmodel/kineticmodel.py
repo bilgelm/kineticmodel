@@ -33,9 +33,6 @@ class KineticModel(metaclass=ABCMeta):
                 if 1-D, can be a column or row vector
             refTAC : np.array
                 time activity curve of the reference region
-                NOTE: maybe this should not be a required input for all
-                      KineticModels -- if there is arterial sampling, then
-                      refTAC is not needed.
             time_unit : one of 's' or 'min'
                 specifies the units of time being supplied
                 t, dt, and halflife must all be supplied in the same unit.
@@ -172,6 +169,152 @@ class KineticModel(metaclass=ABCMeta):
         result = self.results[result_name]
 
         # write result to csv file
+        raise NotImplementedError()
+
+    @classmethod
+    def volume_wrapper(cls,
+                       timeSeriesImgFile=None, frameTimingCsvFile=None, ti=None,
+                       refRegionMaskFile=None, refTAC=None,
+                       time_unit='min', startActivity='flat',
+                       weights='frameduration', halflife=None, Trues=None,
+                       **kwargs):
+        '''
+        Wrapper method for fitting a kinetic model on voxelwise imaging data.
+
+        Args
+        ----
+        Either both of (timeSeriesImgFile, frameTimingCsvFile) OR ti must be specified.
+
+        timeSeriesImgFile : string
+            specification of 4D image file to load
+        frameTimingCsvFile : string
+            specification of the csv file containing frame timing information
+        ti : TemporalImage
+
+        Either refRegionMaskFile or refTAC must be specified.
+
+        refRegionMaskFile : string
+            specification of binary mask image, defining the reference region
+        refTAC : np.array
+            time activity curve of the reference region
+
+        See KineticModel.__init__ for other optional arguments.
+
+        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
+        sigma.
+
+        '''
+
+        import temporalimage
+        from scipy.ndimage import gaussian_filter
+
+        if not (timeSeriesImgFile is None)==(frameTimingCsvFile is None):
+            raise ValueError('If either of timeSeriesImgFile and frameTimingCsvFile is specified, both must be specified')
+
+        if not (timeSeriesImgFile is None) ^ (ti is None):
+            raise TypeError('Either (timeSeriesImgFile, frameTimingCsvFile) or ti must be specified')
+
+        if not (refRegionMaskFile is None) ^ (refTAC is None):
+            raise TypeError('Either refRegionMaskFile or refTAC must be specified')
+
+        if ti is None:
+            ti = temporalimage.load(timeSeriesImgFile, frameTimingCsvFile)
+        img_dat = ti.get_data()
+
+        if refTAC is None:
+            # extract refTAC from image using roi_timeseries function
+            refTAC = ti.roi_timeseries(maskfile=refRegionMaskFile)
+
+        TAC = img_dat.reshape((ti.get_numVoxels(), ti.get_numFrames()))
+        mip = np.amax(TAC,axis=1)
+        mask = mip>=1 # don't process voxels that don't have at least one count
+        TAC = TAC[mask,:]
+        numVox = TAC.shape[0]
+
+        # next, instantiate kineticmodel
+        km = cls(ti.get_midTime(), ti.get_frameDuration(), TAC, refTAC,
+                 time_unit=time_unit, startActivity=startActivity,
+                 weights=weights, halflife=halflife, Trues=Trues)
+
+        # a special case for Zhou 2003 implementation
+        if cls.__name__=='SRTM_Zhou2003':
+            if kwargs.get('fwhm', None) is None:
+                raise ValueError('fwhm must be specified for SRTM_Zhou2003')
+
+            voxSize = ti.header.get_zooms()[0:3]
+            sigma_mm = kwargs['fwhm'] / (2*np.sqrt(2*np.log(2)))
+            sigma = [sigma_mm / v for v in voxSize]
+
+            # supply smoothed TAC for better performance
+            smooth_img_dat = ti.gaussian_filter(sigma)
+            smoothTAC = np.reshape(smooth_img_dat, (np.prod(smooth_img_dat.shape[:-1]), smooth_img_dat.shape[-1]))[mask,:]
+
+            # fit model
+            km.fit(smoothTAC=smoothTAC)
+
+            # Refine R1
+            R1_wlr_flat = np.empty(ti.get_numVoxels())
+            R1_wlr_flat.fill(np.nan)
+            R1_wlr_flat[mask] = km.results['R1']
+            R1_wlr = np.reshape(R1_wlr_flat, img_dat.shape[:-1])
+
+            k2_wlr_flat = np.empty(ti.get_numVoxels())
+            k2_wlr_flat.fill(np.nan)
+            k2_wlr_flat[mask] = km.results['k2']
+            k2_wlr = np.reshape(k2_wlr_flat, img_dat.shape[:-1])
+
+            k2a_wlr_flat = np.empty(ti.get_numVoxels())
+            k2a_wlr_flat.fill(np.nan)
+            k2a_wlr_flat[mask] = km.results['k2a']
+            k2a_wlr = np.reshape(k2a_wlr_flat, img_dat.shape[:-1])
+
+            noiseVar_eqR1_flat = np.empty(ti.get_numVoxels())
+            noiseVar_eqR1_flat.fill(np.nan)
+            noiseVar_eqR1_flat[mask] = km.results['noiseVar_eqR1']
+            noiseVar_eqR1_wlr = np.reshape(noiseVar_eqR1_flat, img_dat.shape[:-1])
+
+            smooth_R1_wlr = gaussian_filter(R1_wlr, sigma=sigma)
+            smooth_k2_wlr = gaussian_filter(k2_wlr, sigma=sigma)
+            smooth_k2a_wlr = gaussian_filter(k2a_wlr, sigma=sigma)
+
+            m = 3
+            h = np.zeros((numVox, m))
+            h[:,0] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(R1_wlr - smooth_R1_wlr),
+                                     sigma=sigma).flatten()[mask]
+            h[:,1] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(k2_wlr - smooth_k2_wlr),
+                                     sigma=sigma).flatten()[mask]
+            h[:,2] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(k2a_wlr - smooth_k2a_wlr),
+                                     sigma=sigma).flatten()[mask]
+
+            km.refine_R1(smooth_R1_wlr.flatten()[mask],
+                         smooth_k2_wlr.flatten()[mask],
+                         smooth_k2a_wlr.flatten()[mask], h)
+        else:
+            km.fit()
+
+        results_img = {}
+        for result_name in cls.result_names:
+            res = np.empty(ti.get_numVoxels())
+            res.fill(np.nan)
+            res[mask] = km.results[result_name]
+            results_img[result_name] = np.reshape(res, img_dat.shape[:-1])
+
+        return results_img
+
+    @classmethod
+    def surface_wrapper(cls,
+                        refTAC=None,
+                        time_unit='min',
+                        startActivity='flat',
+                        weights='frameduration',
+                        **kwargs):
+        '''
+        Wrapper method for fitting a kinetic model on vertexwise imaging data.
+
+        Args
+        ----
+        '''
+
         raise NotImplementedError()
 
 def strictly_increasing(L):

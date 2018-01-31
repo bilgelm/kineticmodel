@@ -3,10 +3,12 @@
 
 # In[1]:
 
+
 from kineticmodel import SRTM_Zhou2003, SRTM_Lammertsma1996
 
 
 # In[2]:
+
 
 import sys, os
 sys.path.insert(0,os.pardir)
@@ -14,6 +16,7 @@ from tests.generate_test_data import generate_fakeTAC_SRTM
 
 
 # In[3]:
+
 
 import numpy as np
 np.random.seed(0)
@@ -24,6 +27,7 @@ get_ipython().magic('matplotlib inline')
 
 
 # In[4]:
+
 
 # generate noiseless fake data based on SRTM
 BP = 0.5
@@ -43,6 +47,7 @@ ax.legend();
 
 # In[5]:
 
+
 # Generate "image" data
 # Assume that entire "image" corresponds to a region with uniform BP and R1 values
 
@@ -57,6 +62,7 @@ TAC_matrix = TAC + np.random.normal(0,np.outer(TAC,np.repeat(pct_noise, numVoxel
 
 # In[6]:
 
+
 fig, ax = plt.subplots();
 ax.plot(t, TAC_matrix.T, label='');
 ax.plot(t, TAC, 'k-', label='TAC');
@@ -69,6 +75,7 @@ ax.legend();
 
 # In[7]:
 
+
 # Initialize SRTM Lammerstma 1996 model
 mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC_matrix, refTAC, time_unit='min')
 
@@ -78,6 +85,7 @@ mdl_lammertsma.fit();
 
 # In[8]:
 
+
 # Initialize SRTM Zhou 2003 model
 mdl_zhou = SRTM_Zhou2003(t, dt, TAC_matrix, refTAC, time_unit='min')
 
@@ -85,6 +93,7 @@ mdl_zhou.fit();
 
 
 # In[9]:
+
 
 # we now take advantage of the spatial constraint capabilities of Zhou model
 
@@ -135,6 +144,7 @@ mdl_zhou_spatial_constraint.refine_R1(smooth_R1,smooth_k2,smooth_k2a,h)
 
 # In[10]:
 
+
 fig, axes = plt.subplots(1,2, figsize=(10,4));
 
 axes[0].plot(mdl_lammertsma.results['BP'], '.', label='Lammertsma 1996');
@@ -152,4 +162,63 @@ axes[1].axhline(y=R1, color='k', linestyle='--');
 axes[1].set_xlabel('voxel');
 axes[1].set_ylabel('R1');
 axes[1].legend();
+
+
+# In[11]:
+
+
+import temporalimage
+ti = temporalimage.TemporalImage(TAC_img, np.eye(4), t-dt/2, t+dt/2)
+
+
+# In[12]:
+
+
+results_img = SRTM_Zhou2003.volume_wrapper(ti=ti, refTAC=refTAC, fwhm=(2*np.sqrt(2*np.log(2))) * 5)
+
+
+# In[13]:
+
+
+results_img.keys()
+
+
+# In[14]:
+
+
+results_img['BP']
+
+
+# In[15]:
+
+
+fig, axes = plt.subplots(1,2, figsize=(10,4));
+
+axes[0].plot(results_img['BP'].flatten(), '.', label='Zhou 2003');
+axes[0].axhline(y=BP, color='k', linestyle='--');
+axes[0].set_xlabel('voxel');
+axes[0].set_ylabel('BP');
+
+axes[1].plot(results_img['R1'].flatten(), '.', label='Zhou 2003');
+axes[1].axhline(y=R1, color='k', linestyle='--');
+axes[1].set_xlabel('voxel');
+axes[1].set_ylabel('R1');
+
+
+# In[16]:
+
+
+np.allclose(mdl_zhou_spatial_constraint.results['BP'], results_img['BP'].flatten(),rtol=1e-18,atol=1e-18)
+
+
+# In[17]:
+
+
+np.allclose(mdl_zhou_spatial_constraint.results['R1'], results_img['R1'].flatten(),rtol=1e-18,atol=1e-18)
+
+
+# In[18]:
+
+
+np.allclose(mdl_zhou_spatial_constraint.results['R1_lrsc'], results_img['R1_lrsc'].flatten(),rtol=1e-18,atol=1e-18)
 
