@@ -19,6 +19,7 @@ Must-to-have:
 
 Nice-to:have:
 
+- [ ] implementation of srtm2 
 - [x] wrapper function for voxelwise image processing
 - [ ] wrapper function for vertexwise image processing
 - [ ] `nipype` integration
