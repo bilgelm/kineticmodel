@@ -16,8 +16,9 @@ Must-to-have:
 - [ ] add examples for region-wise processing
 - [ ] add examples for voxel-wise processing
 - [ ] Additional tests to increase code coverage to 80%
+- [ ] Improve ReadMe and donwload/install instructions
 
-Nice-to:have:
+Nice-to-have:
 
 - [ ] implementation of srtm2 
 - [x] wrapper function for voxelwise image processing
