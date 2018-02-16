@@ -9,13 +9,19 @@ Clone this repository to your machine, then type in terminal:
 `pip install -e PATH_TO/kineticmodel`
 
 ## To-do:
+
+Must-to-have:
 - [ ] open PET data set to use in examples
+- [ ] `save_result` implementation in `kineticmodel.py`
+- [ ] add examples for region-wise processing
+- [ ] add examples for voxel-wise processing
+- [ ] Additional tests to increase code coverage to 80%
+
+Nice-to:have:
+
 - [x] wrapper function for voxelwise image processing
 - [ ] wrapper function for vertexwise image processing
-- [ ] `save_result` implementation in `kineticmodel.py`
 - [ ] `nipype` integration
 - [ ] ❔ command line tools
 - [ ] BIDS integration
-- [ ] Additional tests to increase code coverage
-- [ ] More examples
 - [ ] :question: Incorporate unit handling with a package like `pint` :beer:, `units`, `numericalunits`, or `astropy.units`
