@@ -85,6 +85,9 @@ class KineticModel(metaclass=ABCMeta):
         else:
             raise ValueError('TAC must be 1- or 2-dimensional')
 
+        if not np.all(np.isfinite(TAC)):
+            raise ValueError('TAC must consist of finite values')
+
         if not (t[0]>=0):
             raise ValueError('Time of initial frame must be >=0')
         if not strictly_increasing(t):
@@ -226,15 +229,9 @@ class KineticModel(metaclass=ABCMeta):
             refTAC = ti.roi_timeseries(maskfile=refRegionMaskFile)
 
         TAC = img_dat.reshape((ti.get_numVoxels(), ti.get_numFrames()))
-        print('This is the size of the tac:')
-        print(TAC.shape)
         mip = np.amax(TAC,axis=1)
-        mask = np.all(np.isfinite(TAC)) & (mip>=1) # don't process voxels that don't have at least one count
-        print('The number of voxels in our mask is:')
-        print(mask.sum())
+        mask = np.all(np.isfinite(TAC), axis=1) & (mip>=1) # don't process voxels that don't have at least one count
         TAC = TAC[mask,:]
-        print('Are there any infinite values')
-        print(np.any(np.isfinite(TAC),axis=1))
         numVox = TAC.shape[0]
 
         # next, instantiate kineticmodel
