@@ -172,6 +172,7 @@ class KineticModel(metaclass=ABCMeta):
         result = self.results[result_name]
 
         # write result to csv file
+        
         raise NotImplementedError()
 
     @classmethod
