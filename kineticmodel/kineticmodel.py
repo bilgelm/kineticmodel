@@ -326,9 +326,77 @@ class KineticModel(metaclass=ABCMeta):
 
         Args
         ----
+        Either both of (timeSeriesSurfaceFile, frameTimingCsvFile) OR tiSurf must be specified.
+
+        timeSeriesSurfaceFile : string
+            specification of 4D surface image (2 dimensions are set to 1) to load
+        frameTimingCsvFile : string
+            specification of the csv file containing frame timing information
+        tiSurf : Surface as TemporalImage
+
+        Either refRegionMaskFile and a timeSeriesImgFile or refTAC must be specified.
+
+        refRegionMaskFile : string
+            specification of binary mask image, defining the reference region
+        timeSeriesImgFile : string
+            specification of 4D image file to load
+        refTAC : np.array
+            time activity curve of the reference region
+
+        See KineticModel.__init__ for other optional arguments.
+
+        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
+        sigma.
+
         '''
 
-        raise NotImplementedError()
+        import temporalimage
+        from scipy.ndimage import gaussian_filter
+
+        if not (timeSeriesSurfaceFile is None)==(frameTimingCsvFile is None):
+            raise ValueError('If either of timeSeriesSurfaceFile and frameTimingCsvFile is specified, both must be specified')
+
+        if not (timeSeriesSurfaceFile is None) ^ (tiSurf is None):
+            raise TypeError('Either (timeSeriesSurfaceFile, frameTimingCsvFile) or ti must be specified')
+
+        if not (refRegionMaskFile is None) ^ (refTAC is None):
+            raise TypeError('Either refRegionMaskFile or refTAC must be specified')
+
+        if tiSurf is None:
+            tiSurf = temporalimage.load(timeSeriesSurfaceFile, frameTimingCsvFile)
+        img_dat = tiSurf.get_data()
+
+        if refTAC is None:
+            # extract refTAC from image using roi_timeseries function
+            ti = temporalimage.load(timeSeriesImgFile, frameTimingCsvFile)
+            refTAC = ti.roi_timeseries(maskfile=refRegionMaskFile)
+
+        TAC = img_dat.reshape((ti.get_numVoxels(), ti.get_numFrames()))
+        mip = np.amax(TAC,axis=1)
+        # don't process voxels that don't have at least one count or that have non-finite values
+        mask = np.all(np.isfinite(TAC), axis=1) & (mip>=1)
+        TAC = TAC[mask,:]
+        numVox = TAC.shape[0]
+
+        # next, instantiate kineticmodel
+        km = cls(ti.get_midTime(), ti.get_frameDuration(), TAC, refTAC,
+                 time_unit=time_unit, startActivity=startActivity,
+                 weights=weights, halflife=halflife, Trues=Trues)
+
+        # a special case for Zhou 2003 implementation
+        if cls.__name__=='SRTM_Zhou2003':
+            NotImplementedError("Surface smoothing still needs to be implemented")
+        else:
+            km.fit()
+
+        results_img = {}
+        for result_name in cls.result_names:
+            res = np.empty(ti.get_numVoxels())
+            res.fill(np.nan)
+            res[mask] = km.results[result_name]
+            results_img[result_name] = np.reshape(res, img_dat.shape[:-1])
+
+        return results_img
 
 def strictly_increasing(L):
     '''
