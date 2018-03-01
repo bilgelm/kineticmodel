@@ -19,9 +19,9 @@ get_ipython().magic('matplotlib inline')
 import pandas as pd
 
 
-# In[3]:
+# In[4]:
 
-table=pd.read_table('SB086-nonPVE.txt')
+table=pd.read_table('data/ROI_TAC_nonPVE.txt')
 table.columns
 
 t= pd.Series.as_matrix(np.mean(table.iloc[:,[0, 1]], axis=1))
@@ -39,7 +39,7 @@ ax.set_title('Real PET data');
 ax.legend();
 
 
-# In[6]:
+# In[5]:
 
 # Initialize SRTM Lammerstma 1996 model
 mdl_lammertsma = SRTM_Lammertsma1996(t, dt, TAC, refTAC, time_unit='s')
@@ -51,7 +51,7 @@ mdl_lammertsma.fit();
 mdl_lammertsma.results
 
 
-# In[7]:
+# In[6]:
 
 # Initialize SRTM Zhou 2003 model
 mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC, time_unit='s')
@@ -59,4 +59,9 @@ mdl_zhou = SRTM_Zhou2003(t, dt, TAC, refTAC, time_unit='s')
 mdl_zhou.fit();
 
 mdl_zhou.results
+
+
+# In[ ]:
+
+
 
