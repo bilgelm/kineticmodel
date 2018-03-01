@@ -165,6 +165,18 @@ class KineticModel(metaclass=ABCMeta):
         # update self.results
         return self
 
+    def save_results(self, filename):
+        '''
+        Write results of kinetic model fitting to csv file
+
+        Args
+        ----
+            filename : name of output csv file
+        '''
+
+        from pandas import DataFrame
+        DataFrame(self.results).to_csv(filename)
+
     def save_result(self, result_name):
         if not (result_name in self.__class__.result_names):
             raise ValueError(result_name + ' must be one of ' + self.__class__.result_names)
