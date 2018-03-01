@@ -13,6 +13,7 @@ Clone this repository to your machine, then type in terminal:
 Must-to-have:
 - [ ] open PET data set to use in examples
 - [ ] `save_result` implementation in `kineticmodel.py`
+- [ ] speed up SRTM_Lammertsma1996
 - [ ] add examples for region-wise processing
 - [ ] add examples for voxel-wise processing
 - [ ] Additional tests to increase code coverage to 80%
