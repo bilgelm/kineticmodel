@@ -89,8 +89,9 @@ class KineticModel(metaclass=ABCMeta):
         if not np.all(np.isfinite(TAC)):
             raise ValueError('TAC must consist of finite values')
 
-        #if TAC_rownames is None:
-
+        if TAC_rownames is not None:
+            if not length(TAC_rownames)==TAC.shape[0]:
+                raise ValueError('Number of TAC row names specified must be the same as the number of rows of TAC')
 
         if not (t[0]>=0):
             raise ValueError('Time of initial frame must be >=0')
@@ -122,6 +123,7 @@ class KineticModel(metaclass=ABCMeta):
         self.TAC = TAC
         self.refTAC = refTAC
         self.startActivity = startActivity
+        self.TAC_rownames = TAC_rownames
 
         if weights=='none':
             self.weights = np.ones_like(TAC)
@@ -179,17 +181,7 @@ class KineticModel(metaclass=ABCMeta):
         '''
 
         from pandas import DataFrame
-        DataFrame(self.results).to_csv(filename)
-
-    def save_result(self, result_name):
-        if not (result_name in self.__class__.result_names):
-            raise ValueError(result_name + ' must be one of ' + self.__class__.result_names)
-
-        result = self.results[result_name]
-
-        # write result to csv file
-
-        raise NotImplementedError()
+        DataFrame(self.results, index=self.TAC_rownames).to_csv(filename)
 
     @classmethod
     def volume_wrapper(cls,
@@ -312,7 +304,7 @@ class KineticModel(metaclass=ABCMeta):
             h[:,0] = gaussian_filter(h0, sigma=sigma).flatten()[mask]
             h[:,1] = gaussian_filter(h1, sigma=sigma).flatten()[mask]
             h[:,2] = gaussian_filter(h2, sigma=sigma).flatten()[mask]
-            
+
             km.refine_R1(smooth_R1_wlr_flat_masked,
                          smooth_k2_wlr_flat_masked,
                          smooth_k2a_wlr_flat_masked, h)
