@@ -17,7 +17,8 @@ class KineticModel(metaclass=ABCMeta):
                  startActivity='flat',
                  weights='frameduration',
                  halflife=None,
-                 Trues=None):
+                 Trues=None,
+                 TAC_rownames=None):
         '''
         Method for initializing a kinetic model.
         Defines required inputs for all kinetic models.
@@ -87,6 +88,9 @@ class KineticModel(metaclass=ABCMeta):
 
         if not np.all(np.isfinite(TAC)):
             raise ValueError('TAC must consist of finite values')
+
+        #if TAC_rownames is None:
+
 
         if not (t[0]>=0):
             raise ValueError('Time of initial frame must be >=0')
@@ -282,26 +286,36 @@ class KineticModel(metaclass=ABCMeta):
             k2a_wlr_flat[mask] = km.results['k2a']
             k2a_wlr = np.reshape(k2a_wlr_flat, img_dat.shape[:-1])
 
-            noiseVar_eqR1_flat = np.zeros(ti.get_numVoxels())
-            noiseVar_eqR1_flat[mask] = km.results['noiseVar_eqR1']
-            noiseVar_eqR1_wlr = np.reshape(noiseVar_eqR1_flat, img_dat.shape[:-1])
-
             smooth_R1_wlr = gaussian_filter(R1_wlr, sigma=sigma)
             smooth_k2_wlr = gaussian_filter(k2_wlr, sigma=sigma)
             smooth_k2a_wlr = gaussian_filter(k2a_wlr, sigma=sigma)
 
+            smooth_R1_wlr_flat_masked = smooth_R1_wlr.flatten()[mask]
+            smooth_k2_wlr_flat_masked = smooth_k2_wlr.flatten()[mask]
+            smooth_k2a_wlr_flat_masked = smooth_k2a_wlr.flatten()[mask]
+
             m = 3
             h = np.zeros((numVox, m))
-            h[:,0] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(R1_wlr - smooth_R1_wlr),
-                                     sigma=sigma).flatten()[mask]
-            h[:,1] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(k2_wlr - smooth_k2_wlr),
-                                     sigma=sigma).flatten()[mask]
-            h[:,2] = gaussian_filter(m * noiseVar_eqR1_wlr / np.square(k2a_wlr - smooth_k2a_wlr),
-                                     sigma=sigma).flatten()[mask]
 
-            km.refine_R1(smooth_R1_wlr.flatten()[mask],
-                         smooth_k2_wlr.flatten()[mask],
-                         smooth_k2a_wlr.flatten()[mask], h)
+            h0_flat = np.zeros(ti.get_numVoxels())
+            h0_flat[mask] = m * km.results['noiseVar_eqR1'] / np.square(km.results['R1'] - smooth_R1_wlr_flat_masked)
+            h0 = np.reshape(h0_flat, img_dat.shape[:-1])
+
+            h1_flat = np.zeros(ti.get_numVoxels())
+            h1_flat[mask] = m * km.results['noiseVar_eqR1'] / np.square(km.results['k2'] - smooth_k2_wlr_flat_masked)
+            h1 = np.reshape(h1_flat, img_dat.shape[:-1])
+
+            h2_flat = np.zeros(ti.get_numVoxels())
+            h2_flat[mask] = m * km.results['noiseVar_eqR1'] / np.square(km.results['k2a'] - smooth_k2a_wlr_flat_masked)
+            h2 = np.reshape(h2_flat, img_dat.shape[:-1])
+
+            h[:,0] = gaussian_filter(h0, sigma=sigma).flatten()[mask]
+            h[:,1] = gaussian_filter(h1, sigma=sigma).flatten()[mask]
+            h[:,2] = gaussian_filter(h2, sigma=sigma).flatten()[mask]
+            
+            km.refine_R1(smooth_R1_wlr_flat_masked,
+                         smooth_k2_wlr_flat_masked,
+                         smooth_k2a_wlr_flat_masked, h)
         else:
             km.fit()
 
