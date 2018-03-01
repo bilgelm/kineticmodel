@@ -6,7 +6,6 @@ from scipy.ndimage import gaussian_filter
 from scipy.optimize import curve_fit
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
-from tqdm import tqdm
 
 class SRTM_Zhou2003(KineticModel):
     '''
@@ -58,7 +57,6 @@ class SRTM_Zhou2003(KineticModel):
 
         # Compute BP/DVR, R1, k2, k2a
         for k, TAC in enumerate(self.TAC):
-            #print('voxel ' + str(k) + ' of ' + str(self.TAC.shape[0]))
             W = mat.diag(self.weights[k,:])
 
             # Numerical integration of target TAC
@@ -209,8 +207,7 @@ class SRTM_Lammertsma1996(KineticModel):
 
         srtm_fun = make_srtm_est(self.startActivity)
 
-        for k, TAC in tqdm(enumerate(self.TAC)):
-            #print('voxel ' + str(k) + ' of ' + str(self.TAC.shape[0]))
+        for k, TAC in enumerate(self.TAC):
             popt, pcov = curve_fit(srtm_fun, X, TAC,
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
                                    sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)

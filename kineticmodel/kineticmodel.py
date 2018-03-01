@@ -172,7 +172,7 @@ class KineticModel(metaclass=ABCMeta):
         result = self.results[result_name]
 
         # write result to csv file
-        
+
         raise NotImplementedError()
 
     @classmethod
@@ -231,7 +231,8 @@ class KineticModel(metaclass=ABCMeta):
 
         TAC = img_dat.reshape((ti.get_numVoxels(), ti.get_numFrames()))
         mip = np.amax(TAC,axis=1)
-        mask = np.all(np.isfinite(TAC), axis=1) & (mip>=1) # don't process voxels that don't have at least one count
+        # don't process voxels that don't have at least one count or that have non-finite values
+        mask = np.all(np.isfinite(TAC), axis=1) & (mip>=1)
         TAC = TAC[mask,:]
         numVox = TAC.shape[0]
 
