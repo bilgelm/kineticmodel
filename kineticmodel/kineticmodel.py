@@ -4,6 +4,55 @@ import numpy as np
 import warnings
 
 class KineticModel(metaclass=ABCMeta):
+    '''
+    Method for initializing a kinetic model.
+    Defines required inputs for all kinetic models.
+
+    Args
+    ----
+        t : np.array
+            time corresponding to each point of the time activity curve (TAC)in [seconds]
+        dt : np.array
+            duration of each time frame in [seconds]
+        TAC : np.array 1- or 2-D
+            each row is the time activity curve of a region/voxel/vertex of interest
+            if 1-D, can be a column or row vector
+        refTAC : np.array
+            time activity curve of the reference region
+        time_unit : one of 's' or 'min'
+            specifies the units of time being supplied
+            t, dt, and halflife must all be supplied in the same unit.
+        startActivity : one of 'flat', 'increasing', or 'zero'
+            defines the method for determining the value of the initial
+            integral \int_0^{t_0} TAC(t) dt (default: 'increasing')
+            if 'flat', TAC(t)=TAC(t_0) for 0≤t<t_0, which results in this
+                integral evaluating to t_0 * TAC(t_0)
+            if 'increasing', TAC(t)=TAC(t_0) / t_0 * t for 0≤t<t_0,
+                which results in this integral evaluating to t_0 * TAC(t_0) / 2
+            if 'zero', TAC(t)=0 for 0≤t<t_0, which results in this integral
+                evaluating to 0
+        weights : one of 'none', 'frameduration', 'frameduration_activity',
+            'frameduration_activity_decay', 'trues',
+            or a custom 1- or 2-D np.array
+            equivalent to the precision (inverse of variance) of each time
+            frame; defines weights for each time frame in model fitting
+            If weights is a vector, its length must be equal to length of t.
+            If weights is a matrix, it must be of the same size as TAC.
+            if 'none', each frame is weighted equally
+            if 'frameduration', frame weight is proportional to dt
+            if 'frameduration_activity', frame weight is proportional to dt / TAC
+            if 'frameduration_activity_decay' (halflife must be specified),
+                frame weight is proportional to dt / (TAC * exp(decayConstant * t)),
+                where decayConstant = ln(2) / halflife
+            if 'trues' (halflife and Trues must be specified), frame weight
+                is proportional to dt^2 / (Trues * exp(decayConstant * t)^2)
+            if custom vector, frame weight is proportional to corresponding
+                vector element
+            if custom matrix, each TAC can be assigned a different set of weights
+        halflife : required for decay corrected weights. Must be provided in
+            the same units as t and dt.
+    '''
+
     # possible values for startActivity
     startActivity_values = ('flat','increasing','zero')
 
@@ -19,54 +68,6 @@ class KineticModel(metaclass=ABCMeta):
                  halflife=None,
                  Trues=None,
                  TAC_rownames=None):
-        '''
-        Method for initializing a kinetic model.
-        Defines required inputs for all kinetic models.
-
-        Args
-        ----
-            t : np.array
-                time corresponding to each point of the time activity curve (TAC)in [seconds]
-            dt : np.array
-                duration of each time frame in [seconds]
-            TAC : np.array 1- or 2-D
-                each row is the time activity curve of a region/voxel/vertex of interest
-                if 1-D, can be a column or row vector
-            refTAC : np.array
-                time activity curve of the reference region
-            time_unit : one of 's' or 'min'
-                specifies the units of time being supplied
-                t, dt, and halflife must all be supplied in the same unit.
-            startActivity : one of 'flat', 'increasing', or 'zero'
-                defines the method for determining the value of the initial
-                integral \int_0^{t_0} TAC(t) dt (default: 'increasing')
-                if 'flat', TAC(t)=TAC(t_0) for 0≤t<t_0, which results in this
-                    integral evaluating to t_0 * TAC(t_0)
-                if 'increasing', TAC(t)=TAC(t_0) / t_0 * t for 0≤t<t_0,
-                    which results in this integral evaluating to t_0 * TAC(t_0) / 2
-                if 'zero', TAC(t)=0 for 0≤t<t_0, which results in this integral
-                    evaluating to 0
-            weights : one of 'none', 'frameduration', 'frameduration_activity',
-                'frameduration_activity_decay', 'trues',
-                or a custom 1- or 2-D np.array
-                equivalent to the precision (inverse of variance) of each time
-                frame; defines weights for each time frame in model fitting
-                If weights is a vector, its length must be equal to length of t.
-                If weights is a matrix, it must be of the same size as TAC.
-                if 'none', each frame is weighted equally
-                if 'frameduration', frame weight is proportional to dt
-                if 'frameduration_activity', frame weight is proportional to dt / TAC
-                if 'frameduration_activity_decay' (halflife must be specified),
-                    frame weight is proportional to dt / (TAC * exp(decayConstant * t)),
-                    where decayConstant = ln(2) / halflife
-                if 'trues' (halflife and Trues must be specified), frame weight
-                    is proportional to dt^2 / (Trues * exp(decayConstant * t)^2)
-                if custom vector, frame weight is proportional to corresponding
-                    vector element
-                if custom matrix, each TAC can be assigned a different set of weights
-            halflife : required for decay corrected weights. Must be provided in
-                the same units as t and dt.
-        '''
 
         # basic input checks
         if not t.ndim==dt.ndim==refTAC.ndim==1:
@@ -193,28 +194,23 @@ class KineticModel(metaclass=ABCMeta):
         '''
         Wrapper method for fitting a kinetic model on voxelwise imaging data.
 
+        Either both of (timeSeriesImgFile, frameTimingCsvFile) OR ti must be specified.
+        Either refRegionMaskFile or refTAC must be specified.
+        See KineticModel.__init__ for other optional arguments.
+        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
+        sigma.
+
         Args
         ----
-        Either both of (timeSeriesImgFile, frameTimingCsvFile) OR ti must be specified.
-
         timeSeriesImgFile : string
             specification of 4D image file to load
         frameTimingCsvFile : string
             specification of the csv file containing frame timing information
         ti : TemporalImage
-
-        Either refRegionMaskFile or refTAC must be specified.
-
         refRegionMaskFile : string
             specification of binary mask image, defining the reference region
         refTAC : np.array
             time activity curve of the reference region
-
-        See KineticModel.__init__ for other optional arguments.
-
-        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
-        sigma.
-
         '''
 
         import temporalimage
@@ -330,30 +326,25 @@ class KineticModel(metaclass=ABCMeta):
         '''
         Wrapper method for fitting a kinetic model on vertexwise imaging data.
 
+        Either both of (timeSeriesSurfaceFile, frameTimingCsvFile) OR tiSurf must be specified.
+        Either refRegionMaskFile and a timeSeriesImgFile or refTAC must be specified.
+        See KineticModel.__init__ for other optional arguments.
+        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
+        sigma.
+
         Args
         ----
-        Either both of (timeSeriesSurfaceFile, frameTimingCsvFile) OR tiSurf must be specified.
-
         timeSeriesSurfaceFile : string
             specification of 4D surface image (2 dimensions are set to 1) to load
         frameTimingCsvFile : string
             specification of the csv file containing frame timing information
         tiSurf : Surface as TemporalImage
-
-        Either refRegionMaskFile and a timeSeriesImgFile or refTAC must be specified.
-
         refRegionMaskFile : string
             specification of binary mask image, defining the reference region
         timeSeriesImgFile : string
             specification of 4D image file to load
         refTAC : np.array
             time activity curve of the reference region
-
-        See KineticModel.__init__ for other optional arguments.
-
-        SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
-        sigma.
-
         '''
 
         import temporalimage
@@ -405,14 +396,12 @@ class KineticModel(metaclass=ABCMeta):
         return results_img
 
 def strictly_increasing(L):
-    '''
-    Check if L is a monotonically increasing vector
+    ''' Check if L is a monotonically increasing vector
     '''
     return all(x<y for x, y in zip(L, L[1:]))
 
 def integrate(TAC, t, startActivity='flat'):
-    '''
-    Static method to perform time activity curve integration.
+    ''' Static method to perform time activity curve integration.
     '''
     if not TAC.ndim==t.ndim==1:
         raise ValueError('TAC must be 1-dimensional')
