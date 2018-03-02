@@ -2,16 +2,12 @@
 
 <!doctype html>
 
-
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
     <title>kineticmodel package &#8212; kineticmodel 0.1.0 documentation</title>
-    
     <link rel="stylesheet" href="_static/bizstyle.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
@@ -33,7 +29,7 @@
     <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
     <![endif]-->
   </head>
-  <body role="document">
+  <body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
@@ -52,10 +48,10 @@
   <ul>
 <li><a class="reference internal" href="#">kineticmodel package</a><ul>
 <li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-kineticmodel.kineticmodel">kineticmodel.kineticmodel module</a></li>
-<li><a class="reference internal" href="#module-kineticmodel.srtm">kineticmodel.srtm module</a></li>
-<li><a class="reference internal" href="#module-kineticmodel.srtm_zhou">kineticmodel.srtm_zhou module</a></li>
-<li><a class="reference internal" href="#module-kineticmodel">Module contents</a></li>
+<li><a class="reference internal" href="#kineticmodel-kineticmodel-module">kineticmodel.kineticmodel module</a></li>
+<li><a class="reference internal" href="#kineticmodel-srtm-module">kineticmodel.srtm module</a></li>
+<li><a class="reference internal" href="#kineticmodel-srtm-zhou-module">kineticmodel.srtm_zhou module</a></li>
+<li><a class="reference internal" href="#module-contents">Module contents</a></li>
 </ul>
 </li>
 </ul>
@@ -90,263 +86,17 @@
 <div class="section" id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="module-kineticmodel.kineticmodel">
-<span id="kineticmodel-kineticmodel-module"></span><h2>kineticmodel.kineticmodel module<a class="headerlink" href="#module-kineticmodel.kineticmodel" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="kineticmodel.kineticmodel.KineticModel">
-<em class="property">class </em><code class="descclassname">kineticmodel.kineticmodel.</code><code class="descname">KineticModel</code><span class="sig-paren">(</span><em>t</em>, <em>dt</em>, <em>TAC</em>, <em>refTAC</em>, <em>time_unit</em>, <em>startActivity='flat'</em>, <em>weights='frameduration'</em>, <em>halflife=None</em>, <em>Trues=None</em>, <em>TAC_rownames=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#KineticModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.6)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
-<p>Method for initializing a kinetic model.
-Defines required inputs for all kinetic models.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>t</strong> (<em>np.array</em>) &#8211; time corresponding to each point of the time activity curve (TAC)in [seconds]</li>
-<li><strong>dt</strong> (<em>np.array</em>) &#8211; duration of each time frame in [seconds]</li>
-<li><strong>TAC</strong> (<em>np.array 1-</em><em> or </em><em>2-D</em>) &#8211; each row is the time activity curve of a region/voxel/vertex of interest
-if 1-D, can be a column or row vector</li>
-<li><strong>refTAC</strong> (<em>np.array</em>) &#8211; time activity curve of the reference region</li>
-<li><strong>time_unit</strong> (<em>one of 's'</em><em> or </em><em>'min'</em>) &#8211; specifies the units of time being supplied
-t, dt, and halflife must all be supplied in the same unit.</li>
-<li><strong>startActivity</strong> (<em>one of 'flat'</em><em>, </em><em>'increasing'</em><em>, or </em><em>'zero'</em>) &#8211; <p>defines the method for determining the value of the initial
-integral int_0^{t_0} TAC(t) dt (default: &#8216;increasing&#8217;)
-if &#8216;flat&#8217;, TAC(t)=TAC(t_0) for 0≤t&lt;t_0, which results in this</p>
-<blockquote>
-<div>integral evaluating to t_0 * TAC(t_0)</div></blockquote>
-<dl class="docutils">
-<dt>if &#8216;increasing&#8217;, TAC(t)=TAC(t_0) / t_0 * t for 0≤t&lt;t_0,</dt>
-<dd>which results in this integral evaluating to t_0 * TAC(t_0) / 2</dd>
-<dt>if &#8216;zero&#8217;, TAC(t)=0 for 0≤t&lt;t_0, which results in this integral</dt>
-<dd>evaluating to 0</dd>
-</dl>
-</li>
-<li><strong>weights</strong> (<em>one of 'none'</em><em>, </em><em>'frameduration'</em><em>, </em><em>'frameduration_activity'</em><em>,</em>) &#8211; <p>&#8216;frameduration_activity_decay&#8217;, &#8216;trues&#8217;,
-or a custom 1- or 2-D np.array
-equivalent to the precision (inverse of variance) of each time
-frame; defines weights for each time frame in model fitting
-If weights is a vector, its length must be equal to length of t.
-If weights is a matrix, it must be of the same size as TAC.
-if &#8216;none&#8217;, each frame is weighted equally
-if &#8216;frameduration&#8217;, frame weight is proportional to dt
-if &#8216;frameduration_activity&#8217;, frame weight is proportional to dt / TAC
-if &#8216;frameduration_activity_decay&#8217; (halflife must be specified),</p>
-<blockquote>
-<div>frame weight is proportional to dt / (TAC * exp(decayConstant * t)),
-where decayConstant = ln(2) / halflife</div></blockquote>
-<dl class="docutils">
-<dt>if &#8216;trues&#8217; (halflife and Trues must be specified), frame weight</dt>
-<dd>is proportional to dt^2 / (Trues * exp(decayConstant * t)^2)</dd>
-<dt>if custom vector, frame weight is proportional to corresponding</dt>
-<dd>vector element</dd>
-</dl>
-<p>if custom matrix, each TAC can be assigned a different set of weights</p>
-</li>
-<li><strong>halflife</strong> (<em>required for decay corrected weights. Must be provided in</em>) &#8211; the same units as t and dt.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<dl class="method">
-<dt id="kineticmodel.kineticmodel.KineticModel.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#KineticModel.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="kineticmodel.kineticmodel.KineticModel.save_results">
-<code class="descname">save_results</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#KineticModel.save_results"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.save_results" title="Permalink to this definition">¶</a></dt>
-<dd><p>Write results of kinetic model fitting to csv file</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>filename</strong> (<em>name of output csv file</em>) &#8211; </td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.kineticmodel.KineticModel.startActivity_values">
-<code class="descname">startActivity_values</code><em class="property"> = ('flat', 'increasing', 'zero')</em><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.startActivity_values" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="classmethod">
-<dt id="kineticmodel.kineticmodel.KineticModel.surface_wrapper">
-<em class="property">classmethod </em><code class="descname">surface_wrapper</code><span class="sig-paren">(</span><em>refTAC=None</em>, <em>time_unit='min'</em>, <em>startActivity='flat'</em>, <em>weights='frameduration'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#KineticModel.surface_wrapper"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.surface_wrapper" title="Permalink to this definition">¶</a></dt>
-<dd><p>Wrapper method for fitting a kinetic model on vertexwise imaging data.</p>
-<p>Either both of (timeSeriesSurfaceFile, frameTimingCsvFile) OR tiSurf must be specified.
-Either refRegionMaskFile and a timeSeriesImgFile or refTAC must be specified.
-See KineticModel.__init__ for other optional arguments.
-SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
-sigma.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>timeSeriesSurfaceFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of 4D surface image (2 dimensions are set to 1) to load</li>
-<li><strong>frameTimingCsvFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of the csv file containing frame timing information</li>
-<li><strong>tiSurf</strong> (<em>Surface as TemporalImage</em>) &#8211; </li>
-<li><strong>refRegionMaskFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of binary mask image, defining the reference region</li>
-<li><strong>timeSeriesImgFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of 4D image file to load</li>
-<li><strong>refTAC</strong> (<em>np.array</em>) &#8211; time activity curve of the reference region</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="classmethod">
-<dt id="kineticmodel.kineticmodel.KineticModel.volume_wrapper">
-<em class="property">classmethod </em><code class="descname">volume_wrapper</code><span class="sig-paren">(</span><em>timeSeriesImgFile=None</em>, <em>frameTimingCsvFile=None</em>, <em>ti=None</em>, <em>refRegionMaskFile=None</em>, <em>refTAC=None</em>, <em>time_unit='min'</em>, <em>startActivity='flat'</em>, <em>weights='frameduration'</em>, <em>halflife=None</em>, <em>Trues=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#KineticModel.volume_wrapper"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.volume_wrapper" title="Permalink to this definition">¶</a></dt>
-<dd><p>Wrapper method for fitting a kinetic model on voxelwise imaging data.</p>
-<p>Either both of (timeSeriesImgFile, frameTimingCsvFile) OR ti must be specified.
-Either refRegionMaskFile or refTAC must be specified.
-See KineticModel.__init__ for other optional arguments.
-SRTM_Zhou2003 requires the input fwhm, which determines the smoothing
-sigma.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>timeSeriesImgFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of 4D image file to load</li>
-<li><strong>frameTimingCsvFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of the csv file containing frame timing information</li>
-<li><strong>ti</strong> (<em>TemporalImage</em>) &#8211; </li>
-<li><strong>refRegionMaskFile</strong> (<a class="reference external" href="https://docs.python.org/3/library/string.html#module-string" title="(in Python v3.6)"><em>string</em></a>) &#8211; specification of binary mask image, defining the reference region</li>
-<li><strong>refTAC</strong> (<em>np.array</em>) &#8211; time activity curve of the reference region</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.kineticmodel.KineticModel.weights_values">
-<code class="descname">weights_values</code><em class="property"> = ('none', 'frameduration', 'frameduration_activity', 'frameduration_activity_decay')</em><a class="headerlink" href="#kineticmodel.kineticmodel.KineticModel.weights_values" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="function">
-<dt id="kineticmodel.kineticmodel.integrate">
-<code class="descclassname">kineticmodel.kineticmodel.</code><code class="descname">integrate</code><span class="sig-paren">(</span><em>TAC</em>, <em>t</em>, <em>startActivity='flat'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#integrate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.integrate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Static method to perform time activity curve integration.</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="kineticmodel.kineticmodel.strictly_increasing">
-<code class="descclassname">kineticmodel.kineticmodel.</code><code class="descname">strictly_increasing</code><span class="sig-paren">(</span><em>L</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/kineticmodel.html#strictly_increasing"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.kineticmodel.strictly_increasing" title="Permalink to this definition">¶</a></dt>
-<dd><p>Check if L is a monotonically increasing vector</p>
-</dd></dl>
-
+<div class="section" id="kineticmodel-kineticmodel-module">
+<h2>kineticmodel.kineticmodel module<a class="headerlink" href="#kineticmodel-kineticmodel-module" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="module-kineticmodel.srtm">
-<span id="kineticmodel-srtm-module"></span><h2>kineticmodel.srtm module<a class="headerlink" href="#module-kineticmodel.srtm" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="kineticmodel.srtm.SRTM_Lammertsma1996">
-<em class="property">class </em><code class="descclassname">kineticmodel.srtm.</code><code class="descname">SRTM_Lammertsma1996</code><span class="sig-paren">(</span><em>t</em>, <em>dt</em>, <em>TAC</em>, <em>refTAC</em>, <em>time_unit</em>, <em>startActivity='flat'</em>, <em>weights='frameduration'</em>, <em>halflife=None</em>, <em>Trues=None</em>, <em>TAC_rownames=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm.html#SRTM_Lammertsma1996"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm.SRTM_Lammertsma1996" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#kineticmodel.kineticmodel.KineticModel" title="kineticmodel.kineticmodel.KineticModel"><code class="xref py py-class docutils literal"><span class="pre">kineticmodel.kineticmodel.KineticModel</span></code></a></p>
-<p>Compute binding potential (BP) and relative delivery (R1) kinetic parameters
-from dynamic PET data based on simplified reference tissue model (SRTM).
-Reference:
-Simplified reference tissue model for PET receptor studies.Lammertsma AA1,
-Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.</p>
-<dl class="method">
-<dt id="kineticmodel.srtm.SRTM_Lammertsma1996.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm.html#SRTM_Lammertsma1996.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm.SRTM_Lammertsma1996.fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.srtm.SRTM_Lammertsma1996.result_names">
-<code class="descname">result_names</code><em class="property"> = ['BP', 'R1', 'k2', 'err', 'mse', 'fpe', 'logl', 'akaike']</em><a class="headerlink" href="#kineticmodel.srtm.SRTM_Lammertsma1996.result_names" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="kineticmodel.srtm.SRTM_Zhou2003">
-<em class="property">class </em><code class="descclassname">kineticmodel.srtm.</code><code class="descname">SRTM_Zhou2003</code><span class="sig-paren">(</span><em>t</em>, <em>dt</em>, <em>TAC</em>, <em>refTAC</em>, <em>time_unit</em>, <em>startActivity='flat'</em>, <em>weights='frameduration'</em>, <em>halflife=None</em>, <em>Trues=None</em>, <em>TAC_rownames=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm.html#SRTM_Zhou2003"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm.SRTM_Zhou2003" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#kineticmodel.kineticmodel.KineticModel" title="kineticmodel.kineticmodel.KineticModel"><code class="xref py py-class docutils literal"><span class="pre">kineticmodel.kineticmodel.KineticModel</span></code></a></p>
-<p>Compute binding potential (BP) and relative delivery (R1) kinetic parameters
-from dynamic PET data based on simplified reference tissue model (SRTM).
-The nonlinear SRTM equations are linearized using integrals of time
-activity curves (TACs) of the reference and target tissues. Kinetic
-parameters are then estimated by weighted linear regression (WLR).
-If provided, the spatially smoothed TAC of the target region is used in
-the computation of BP as part of the linear regression with spatial
-constraint (LRSC) approach.</p>
-<p>To obtain the R1 estimate that incorporates spatial smoothness based on
-LRSC, run refine_R1() after running fit().</p>
-<p>Reference:
-Zhou Y, Endres CJ, Brašić JR, Huang S-C, Wong DF.
-Linear regression with spatial constraint to generate parametric images of
-ligand-receptor dynamic PET studies with a simplified reference tissue model.
-Neuroimage. 2003;18:975–989.</p>
-<dl class="method">
-<dt id="kineticmodel.srtm.SRTM_Zhou2003.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>smoothTAC=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm.html#SRTM_Zhou2003.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm.SRTM_Zhou2003.fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="kineticmodel.srtm.SRTM_Zhou2003.refine_R1">
-<code class="descname">refine_R1</code><span class="sig-paren">(</span><em>smoothR1</em>, <em>smoothk2</em>, <em>smoothk2a</em>, <em>h</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm.html#SRTM_Zhou2003.refine_R1"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm.SRTM_Zhou2003.refine_R1" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.srtm.SRTM_Zhou2003.result_names">
-<code class="descname">result_names</code><em class="property"> = ['BP', 'R1', 'k2', 'k2a', 'R1_lrsc', 'k2_lrsc', 'k2a_lrsc', 'noiseVar_eqDVR', 'noiseVar_eqR1']</em><a class="headerlink" href="#kineticmodel.srtm.SRTM_Zhou2003.result_names" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
+<div class="section" id="kineticmodel-srtm-module">
+<h2>kineticmodel.srtm module<a class="headerlink" href="#kineticmodel-srtm-module" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="module-kineticmodel.srtm_zhou">
-<span id="kineticmodel-srtm-zhou-module"></span><h2>kineticmodel.srtm_zhou module<a class="headerlink" href="#module-kineticmodel.srtm_zhou" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="kineticmodel.srtm_zhou.KineticModel">
-<em class="property">class </em><code class="descclassname">kineticmodel.srtm_zhou.</code><code class="descname">KineticModel</code><span class="sig-paren">(</span><em>t=None</em>, <em>dt=None</em>, <em>TAC=None</em>, <em>refTAC=None</em>, <em>startActivity='flat'</em>, <em>timg=None</em>, <em>refmaskimgfile=None</em>, <em>tacmaskimgfile=None</em>, <em>fitVoxel=True</em>, <em>frameTime='mid'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm_zhou.html#KineticModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.6)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
-<dl class="method">
-<dt id="kineticmodel.srtm_zhou.KineticModel.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm_zhou.html#KineticModel.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel.fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.srtm_zhou.KineticModel.frameTime_values">
-<code class="descname">frameTime_values</code><em class="property"> = ('start', 'mid', 'end')</em><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel.frameTime_values" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="kineticmodel.srtm_zhou.KineticModel.save_result">
-<code class="descname">save_result</code><span class="sig-paren">(</span><em>result_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm_zhou.html#KineticModel.save_result"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel.save_result" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="kineticmodel.srtm_zhou.KineticModel.startActivity_values">
-<code class="descname">startActivity_values</code><em class="property"> = ('flat', 'increasing', 'zero')</em><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel.startActivity_values" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="kineticmodel.srtm_zhou.KineticModel.unwind_result">
-<code class="descname">unwind_result</code><span class="sig-paren">(</span><em>result_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm_zhou.html#KineticModel.unwind_result"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm_zhou.KineticModel.unwind_result" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="function">
-<dt id="kineticmodel.srtm_zhou.fit">
-<code class="descclassname">kineticmodel.srtm_zhou.</code><code class="descname">fit</code><span class="sig-paren">(</span><em>self</em>, <em>sigma_vox=None</em>, <em>sigma_mm=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/kineticmodel/srtm_zhou.html#fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kineticmodel.srtm_zhou.fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
+<div class="section" id="kineticmodel-srtm-zhou-module">
+<h2>kineticmodel.srtm_zhou module<a class="headerlink" href="#kineticmodel-srtm-zhou-module" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="module-kineticmodel">
-<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-kineticmodel" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-contents">
+<h2>Module contents<a class="headerlink" href="#module-contents" title="Permalink to this headline">¶</a></h2>
 </div>
 </div>
 
@@ -369,7 +119,7 @@ Neuroimage. 2003;18:975–989.</p>
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.6.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.6.3.
     </div>
   </body>
 </html>
