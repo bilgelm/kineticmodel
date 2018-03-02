@@ -1,0 +1,419 @@
+
+
+<!doctype html>
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>kineticmodel.srtm_zhou &#8212; kineticmodel 0.1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">kineticmodel 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for kineticmodel.srtm_zhou</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">abc</span> <span class="k">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">integrate</span> <span class="k">as</span> <span class="n">sp_integrate</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<div class="viewcode-block" id="KineticModel"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm_zhou.KineticModel">[docs]</a><span class="k">class</span> <span class="nc">KineticModel</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+    <span class="c1"># possible values for startActivity</span>
+    <span class="n">startActivity_values</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;flat&#39;</span><span class="p">,</span><span class="s1">&#39;increasing&#39;</span><span class="p">,</span><span class="s1">&#39;zero&#39;</span><span class="p">)</span>
+
+    <span class="c1"># possible values for frameTime</span>
+    <span class="n">frameTime_values</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;start&#39;</span><span class="p">,</span><span class="s1">&#39;mid&#39;</span><span class="p">,</span><span class="s1">&#39;end&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">TAC</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">refTAC</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">startActivity</span><span class="o">=</span><span class="s1">&#39;flat&#39;</span><span class="p">,</span>
+                 <span class="n">timg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">refmaskimgfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tacmaskimgfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fitVoxel</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frameTime</span><span class="o">=</span><span class="s1">&#39;mid&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Method for initializing a kinetic model.</span>
+<span class="sd">        Defines required inputs for all kinetic models.</span>
+
+<span class="sd">        There are two possibilities for input specification: Either</span>
+<span class="sd">        1) t, dt, TAC, refTAC are specified;</span>
+<span class="sd">                   OR</span>
+<span class="sd">        2) timg, refmaskimgfile (and optionally tacmaskimgfile) are specified.</span>
+
+<span class="sd">        If (2), we first extract t, dt, TAC, refTAC from the timg.</span>
+
+<span class="sd">        Args</span>
+<span class="sd">        ----</span>
+<span class="sd">            t : np.array</span>
+<span class="sd">                time corresponding to each point of the time activity curve (TAC)</span>
+<span class="sd">            dt : np.array</span>
+<span class="sd">                duration of each time frame</span>
+<span class="sd">            TAC : np.array 1- or 2-D</span>
+<span class="sd">                each row is the time activity curve of a region/voxel/vertex of interest</span>
+<span class="sd">                if 1-D, can be a column or row vector</span>
+<span class="sd">            refTAC : np.array</span>
+<span class="sd">                time activity curve of the reference region</span>
+<span class="sd">                NOTE: maybe this should not be a required input for all</span>
+<span class="sd">                      KineticModels -- if there is arterial sampling, then</span>
+<span class="sd">                      refTAC is not needed.</span>
+<span class="sd">            startActivity : one of &#39;flat&#39;, &#39;increasing&#39;, or &#39;zero&#39;</span>
+<span class="sd">                defines the method for determining the value of the initial</span>
+<span class="sd">                integral \int_0^{t_0} TAC(t) dt (default: &#39;increasing&#39;)</span>
+<span class="sd">                if &#39;flat&#39;, TAC(t)=TAC(t_0) for 0≤t&lt;t_0, which results in this</span>
+<span class="sd">                    integral evaluating to t_0 * TAC(t_0)</span>
+<span class="sd">                if &#39;increasing&#39;, TAC(t)=TAC(t_0) / t_0 * t for 0≤t&lt;t_0,</span>
+<span class="sd">                    which results in this integral evaluating to t_0 * TAC(t_0) / 2</span>
+<span class="sd">                if &#39;zero&#39;, TAC(t)=0 for 0≤t&lt;t_0, which results in this integral</span>
+<span class="sd">                    evaluating to 0</span>
+<span class="sd">            timg : TemporalImage</span>
+<span class="sd">                   t, dt, TAC, and refTAC will be extracted from this variable</span>
+<span class="sd">            refmaskimgfile : string</span>
+<span class="sd">                             path to mask that defines the reference region</span>
+<span class="sd">            tacmaskimgfile : string</span>
+<span class="sd">                             path to mask or label image that defines the</span>
+<span class="sd">                             voxels/regions of interest</span>
+<span class="sd">            fitVoxel : bool</span>
+<span class="sd">                       determines whether each voxel should be fitted separately</span>
+<span class="sd">                       (fitVoxel=True) or whether they should be combined per</span>
+<span class="sd">                       label to yield ROIs which will then be fitted individually</span>
+<span class="sd">                       (fitVoxel=False)</span>
+<span class="sd">            frameTime : one of &#39;start&#39;, &#39;mid&#39;, &#39;end&#39;</span>
+<span class="sd">                determines whether to use the start time, mid time, or end time</span>
+<span class="sd">                of the frames in kinetic model</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+        <span class="n">workflow_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">dt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">TAC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">refTAC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="c1"># if any is not None, all must be present.</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">t</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">dt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">TAC</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">refTAC</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;(t, dt, TAC, refTAC) must all be specified if </span><span class="se">\</span>
+<span class="s1">                                any one of them is specified.&#39;</span><span class="p">)</span>
+            <span class="n">workflow_t</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">timg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">refmaskimgfile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">tacmaskimgfile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">timg</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">refmaskimgfile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;(timg, refmaskfile) must all be specified if </span><span class="se">\</span>
+<span class="s1">                                any one of (timg, refmaskfile, tacmaskimgfile) </span><span class="se">\</span>
+<span class="s1">                                is specified.&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">workflow_t</span> <span class="o">^</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Either (t, dt, TAC, refTAC) or </span><span class="se">\</span>
+<span class="s1">                            (timg, refmaskimgfile) must be specified&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">frameTime</span><span class="o">==</span><span class="s1">&#39;start&#39;</span><span class="p">:</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_frameStart</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="n">frameTime</span><span class="o">==</span><span class="s1">&#39;mid&#39;</span><span class="p">:</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_midTime</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="n">frameTime</span><span class="o">==</span><span class="s1">&#39;end&#39;</span><span class="p">:</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_frameEnd</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;frameTime must be one of: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">KineticModel</span><span class="o">.</span><span class="n">frameTime_values</span><span class="p">))</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">timg</span> <span class="o">=</span> <span class="n">timg</span> <span class="c1"># problems could arise if this is not a deep copy</span>
+
+            <span class="n">dt</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_frameDuration</span><span class="p">()</span>
+
+            <span class="n">refTAC</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">roi_timeseries</span><span class="p">(</span><span class="n">refmaskimgfile</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">tacmaskimgfile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Use all voxels in image</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">timg</span><span class="o">.</span><span class="n">get_data</span><span class="p">()[:,:,:,</span><span class="mi">0</span><span class="p">])</span>
+                <span class="c1">#TAC = timg.get_data().reshape(timg.get_numVoxels(),timg.get_numFrames())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="kn">from</span> <span class="nn">nibabel</span> <span class="k">import</span> <span class="n">load</span> <span class="k">as</span> <span class="n">nibload</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span> <span class="o">=</span> <span class="n">nibload</span><span class="p">(</span><span class="n">tacmaskimgfile</span><span class="p">)</span><span class="o">.</span><span class="n">get_data</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">fitVoxel</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+                <span class="n">TAC</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_data</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">labellist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">)</span>
+                <span class="c1">#labellist = np.setdiff1d(labellist, [0]) # exclude 0 label?</span>
+                <span class="n">TAC</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">labellist</span><span class="p">),</span> <span class="n">timg</span><span class="o">.</span><span class="n">get_numFrames</span><span class="p">()))</span>
+                <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">labellist</span><span class="p">:</span>
+                    <span class="n">TAC</span><span class="p">[</span><span class="n">label</span><span class="p">,:]</span> <span class="o">=</span> <span class="n">timg</span><span class="o">.</span><span class="n">roi_timeseries</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="o">==</span><span class="n">label</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">timg</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># basic input checks</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">t</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="n">dt</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="n">refTAC</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;KineticModel inputs t, dt, refTAC must be 1-D&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">refTAC</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;KineticModel inputs t, dt, refTAC must have same length&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">TAC</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">TAC</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;KineticModel inputs TAC and t must have same length&#39;</span><span class="p">)</span>
+            <span class="c1"># make TAC into a row vector</span>
+            <span class="n">TAC</span> <span class="o">=</span> <span class="n">TAC</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,:]</span>
+        <span class="k">elif</span> <span class="n">TAC</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">2</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Number of columns of TAC must be the same </span><span class="se">\</span>
+<span class="s1">                                  as length of t&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;TAC must be 1- or 2-dimensional&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">&gt;=</span><span class="mi">0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Time of initial frame must be &gt;=0&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">strictly_increasing</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Time values must be monotonically increasing&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">dt</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Time frame durations must be &gt;0&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">startActivity</span> <span class="ow">in</span> <span class="n">KineticModel</span><span class="o">.</span><span class="n">startActivity_values</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;startActivity must be one of: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">KineticModel</span><span class="o">.</span><span class="n">startActivity_values</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">t</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dt</span> <span class="o">=</span> <span class="n">dt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">TAC</span> <span class="o">=</span> <span class="n">TAC</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span> <span class="o">=</span> <span class="n">refTAC</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span> <span class="o">=</span> <span class="n">startActivity</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">result_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">result_names</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="n">result_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="c1">#self.results[result_name].fill(np.nan)</span>
+
+    <span class="nd">@abstractmethod</span>
+<div class="viewcode-block" id="KineticModel.fit"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm_zhou.KineticModel.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># update self.results</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+<div class="viewcode-block" id="KineticModel.unwind_result"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm_zhou.KineticModel.unwind_result">[docs]</a>    <span class="k">def</span> <span class="nf">unwind_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result_name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">result_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">result_names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">result_name</span> <span class="o">+</span> <span class="s1">&#39; must be one of &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">result_names</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitVoxel</span><span class="p">:</span>
+            <span class="n">result_img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">)</span>
+            <span class="n">result_img</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+            <span class="n">result_img</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="n">result_name</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">result_img</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="n">result_name</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="KineticModel.save_result"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm_zhou.KineticModel.save_result">[docs]</a>    <span class="k">def</span> <span class="nf">save_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result_name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">result_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">result_names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">result_name</span> <span class="o">+</span> <span class="s1">&#39; must be one of &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">result_names</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwind_result</span><span class="p">(</span><span class="n">result_name</span><span class="p">)</span>
+
+        <span class="c1"># write result to file</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitVoxel</span><span class="p">:</span>
+            <span class="c1"># write result img to file</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># write result to csv file</span>
+            <span class="k">pass</span></div></div>
+
+<div class="viewcode-block" id="fit"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm_zhou.fit">[docs]</a><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sigma_vox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_mm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># get smooth TACs (only if working with voxelwise image data)</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitVoxel</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">((</span><span class="n">sigma_vox</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">sigma_mm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Either sigma_mm or sigma_vox must be specified&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sigma_vox</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sigma_vox</span> <span class="o">=</span> <span class="p">[</span><span class="n">sigma_mm</span> <span class="o">/</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">timg</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">get_zooms</span><span class="p">()[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+
+        <span class="c1"># smooth the image</span>
+        <span class="n">smoothData</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">timg</span><span class="o">.</span><span class="n">gaussian_filter</span><span class="p">(</span><span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># get TACs from smoothed image</span>
+        <span class="n">smoothTAC</span> <span class="o">=</span> <span class="n">smoothData</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    if smoothTAC is not None:</span>
+<span class="sd">        if smoothTAC.ndim==1:</span>
+<span class="sd">            if not len(smoothTAC)==len(self.t):</span>
+<span class="sd">                raise ValueError(&#39;smoothTAC and t must have same length&#39;)</span>
+<span class="sd">            # make smoothTAC into a row vector</span>
+<span class="sd">            smoothTAC = smoothTAC[np.newaxis,:]</span>
+<span class="sd">        elif smoothTAC.ndim==2:</span>
+<span class="sd">            if not all(smoothTAC.shape==self.TAC.shape):</span>
+<span class="sd">                raise ValueError(&#39;smoothTAC and TAC must have same shape&#39;)</span>
+<span class="sd">        else:</span>
+<span class="sd">            raise ValueError(&#39;smoothTAC must be 1- or 2-dimensional&#39;)</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="mi">3</span>
+
+    <span class="c1"># diagonal matrix with diagonal elements corresponding to the duration</span>
+    <span class="c1"># of each time frame</span>
+    <span class="n">W</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dt</span><span class="p">)</span>
+
+    <span class="c1"># Numerical integration of reference TAC</span>
+    <span class="n">intrefTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+    <span class="c1"># Compute BP/DVR, R1, k2, k2a</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">TAC</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="p">):</span>
+        <span class="c1"># Numerical integration of target TAC</span>
+        <span class="n">intTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="n">TAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+        <span class="c1"># ----- Get DVR, BP -----</span>
+        <span class="c1"># Set up the weighted linear regression model</span>
+        <span class="c1"># based on Eq. 9 in Zhou et al.</span>
+        <span class="c1"># Per the recommendation in first paragraph on p. 979 of Zhou et al.,</span>
+        <span class="c1"># smoothed TAC is used in the design matrix, if working with voxelwise image data.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitVoxel</span><span class="p">:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">intrefTAC</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span> <span class="n">smoothTAC</span><span class="p">[</span><span class="n">k</span><span class="p">,:]</span><span class="o">.</span><span class="n">flatten</span><span class="p">())))</span>
+        <span class="k">else</span><span class="p">:</span> <span class="c1">#if smoothTAC is None:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">intrefTAC</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span> <span class="n">TAC</span><span class="p">)))</span>
+
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">intTAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">residual</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">X</span> <span class="o">*</span> <span class="n">b</span>
+        <span class="n">noiseVar_eqDVR</span> <span class="o">=</span> <span class="n">residual</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">residual</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># unbiased estimator of noise variance</span>
+
+        <span class="n">DVR</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1">#R1 = -b[1] / b[2]</span>
+        <span class="c1">#k2 = -b[0] / b[2]</span>
+        <span class="n">BP</span> <span class="o">=</span> <span class="n">DVR</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="c1"># ----- Get R1 -----</span>
+        <span class="c1"># Set up the weighted linear regression model</span>
+        <span class="c1"># based on Eq. 8 in Zhou et al.</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="n">intrefTAC</span><span class="p">,</span><span class="o">-</span><span class="n">intTAC</span><span class="p">)))</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">TAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">residual</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">X</span> <span class="o">*</span> <span class="n">b</span>
+        <span class="n">noiseVar_eqR1</span> <span class="o">=</span> <span class="n">residual</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">residual</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># unbiased estimator of noise variance</span>
+
+        <span class="n">R1</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">k2</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">k2a</span> <span class="o">=</span> <span class="o">-</span><span class="n">b</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;BP&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">BP</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;R1&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">R1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2a&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2a</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;noiseVar_eqDVR&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">noiseVar_eqDVR</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;noiseVar_eqR1&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">noiseVar_eqR1</span>
+
+    <span class="c1"># refine R1 (only if working with voxelwise image data)</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">workflow_img</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitVoxel</span><span class="p">:</span>
+        <span class="c1"># get results back in image format</span>
+        <span class="n">img_R1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwind_result</span><span class="p">(</span><span class="s1">&#39;R1&#39;</span><span class="p">)</span>
+        <span class="n">img_k2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwind_result</span><span class="p">(</span><span class="s1">&#39;k2&#39;</span><span class="p">)</span>
+        <span class="n">img_k2a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwind_result</span><span class="p">(</span><span class="s1">&#39;k2a&#39;</span><span class="p">)</span>
+        <span class="n">img_noiseVar_eqR1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwind_result</span><span class="p">(</span><span class="s1">&#39;noiseVar_eqR1&#39;</span><span class="p">)</span>
+
+        <span class="c1"># smooth parameter estimates</span>
+        <span class="n">smooth_img_R1</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">img_R1</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">smooth_img_k2</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">img_k2</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">smooth_img_k2a</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">img_k2a</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># put back into vector form</span>
+        <span class="n">smooth_R1</span> <span class="o">=</span> <span class="n">smooth_img_R1</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span> <span class="c1">#.flatten()</span>
+        <span class="n">smooth_k2</span> <span class="o">=</span> <span class="n">smooth_img_k2</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+        <span class="n">smooth_k2a</span> <span class="o">=</span> <span class="n">smooth_img_k2a</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+
+        <span class="c1"># get h</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">m</span><span class="p">))</span>
+        <span class="n">h</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">m</span> <span class="o">*</span> <span class="n">img_noiseVar_eqR1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">img_R1</span> <span class="o">-</span> <span class="n">smooth_img_R1</span><span class="p">),</span>
+                                 <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+        <span class="n">h</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">m</span> <span class="o">*</span> <span class="n">img_noiseVar_eqR1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">img_k2</span> <span class="o">-</span> <span class="n">smooth_img_k2</span><span class="p">),</span>
+                                 <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+        <span class="n">h</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">m</span> <span class="o">*</span> <span class="n">img_noiseVar_eqR1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">img_k2a</span> <span class="o">-</span> <span class="n">smooth_img_k2a</span><span class="p">),</span>
+                                 <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_vox</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)[</span><span class="bp">self</span><span class="o">.</span><span class="n">labelimg</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">TAC</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="p">):</span>
+            <span class="c1"># Numerical integration of target TAC</span>
+            <span class="n">intTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="n">TAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+            <span class="c1"># ----- Get R1 incorporating spatial constraint -----</span>
+            <span class="c1"># Set up the ridge regression model</span>
+            <span class="c1"># based on Eq. 11 in Zhou et al.</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="n">intrefTAC</span><span class="p">,</span><span class="o">-</span><span class="n">intTAC</span><span class="p">)))</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">TAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">H</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="n">k</span><span class="p">,:])</span>
+            <span class="n">b_sc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span> <span class="p">(</span><span class="n">smooth_R1</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">smooth_k2</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">smooth_k2a</span><span class="p">[</span><span class="n">k</span><span class="p">])</span> <span class="p">)</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span> <span class="o">+</span> <span class="n">H</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span> <span class="o">+</span> <span class="n">H</span> <span class="o">*</span> <span class="n">b_sc</span><span class="p">)</span>
+
+            <span class="n">R1_lrsc</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">k2_lrsc</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">k2a_lrsc</span> <span class="o">=</span> <span class="o">-</span><span class="n">b</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;R1_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">R1_lrsc</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2_lrsc</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2a_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2a_lrsc</span>
+
+    <span class="k">return</span> <span class="bp">self</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">kineticmodel 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.6.
+    </div>
+  </body>
+</html>

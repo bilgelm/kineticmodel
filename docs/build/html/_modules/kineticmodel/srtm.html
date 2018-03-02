@@ -1,0 +1,349 @@
+
+
+<!doctype html>
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>kineticmodel.srtm &#8212; kineticmodel 0.1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">kineticmodel 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for kineticmodel.srtm</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">numpy.matlib</span> <span class="k">as</span> <span class="nn">mat</span>
+<span class="kn">from</span> <span class="nn">scipy.linalg</span> <span class="k">import</span> <span class="n">solve</span>
+<span class="kn">from</span> <span class="nn">scipy.ndimage</span> <span class="k">import</span> <span class="n">gaussian_filter</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="k">import</span> <span class="n">curve_fit</span>
+<span class="kn">from</span> <span class="nn">kineticmodel</span> <span class="k">import</span> <span class="n">KineticModel</span>
+<span class="kn">from</span> <span class="nn">kineticmodel</span> <span class="k">import</span> <span class="n">integrate</span> <span class="k">as</span> <span class="n">km_integrate</span>
+
+<div class="viewcode-block" id="SRTM_Zhou2003"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm.SRTM_Zhou2003">[docs]</a><span class="k">class</span> <span class="nc">SRTM_Zhou2003</span><span class="p">(</span><span class="n">KineticModel</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute binding potential (BP) and relative delivery (R1) kinetic parameters</span>
+<span class="sd">    from dynamic PET data based on simplified reference tissue model (SRTM).</span>
+<span class="sd">    The nonlinear SRTM equations are linearized using integrals of time</span>
+<span class="sd">    activity curves (TACs) of the reference and target tissues. Kinetic</span>
+<span class="sd">    parameters are then estimated by weighted linear regression (WLR).</span>
+<span class="sd">    If provided, the spatially smoothed TAC of the target region is used in</span>
+<span class="sd">    the computation of BP as part of the linear regression with spatial</span>
+<span class="sd">    constraint (LRSC) approach.</span>
+
+<span class="sd">    To obtain the R1 estimate that incorporates spatial smoothness based on</span>
+<span class="sd">    LRSC, run refine_R1() after running fit().</span>
+
+<span class="sd">    Reference:</span>
+<span class="sd">    Zhou Y, Endres CJ, Brašić JR, Huang S-C, Wong DF.</span>
+<span class="sd">    Linear regression with spatial constraint to generate parametric images of</span>
+<span class="sd">    ligand-receptor dynamic PET studies with a simplified reference tissue model.</span>
+<span class="sd">    Neuroimage. 2003;18:975–989.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="c1"># This class will compute the following results:</span>
+    <span class="n">result_names</span> <span class="o">=</span> <span class="p">[</span> <span class="c1"># estimated parameters</span>
+                    <span class="s1">&#39;BP&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;R1&#39;</span><span class="p">,</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span><span class="s1">&#39;k2a&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;R1_lrsc&#39;</span><span class="p">,</span><span class="s1">&#39;k2_lrsc&#39;</span><span class="p">,</span><span class="s1">&#39;k2a_lrsc&#39;</span><span class="p">,</span>
+                    <span class="c1"># model fit indicators</span>
+                    <span class="s1">&#39;noiseVar_eqDVR&#39;</span><span class="p">,</span><span class="s1">&#39;noiseVar_eqR1&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="SRTM_Zhou2003.fit"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm.SRTM_Zhou2003.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smoothTAC</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">smoothTAC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">smoothTAC</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">smoothTAC</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;smoothTAC and t must have same length&#39;</span><span class="p">)</span>
+                <span class="c1"># make smoothTAC into a row vector</span>
+                <span class="n">smoothTAC</span> <span class="o">=</span> <span class="n">smoothTAC</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,:]</span>
+            <span class="k">elif</span> <span class="n">smoothTAC</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">2</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">smoothTAC</span><span class="o">.</span><span class="n">shape</span><span class="o">==</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;smoothTAC and TAC must have same shape&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;smoothTAC must be 1- or 2-dimensional&#39;</span><span class="p">)</span>
+
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="mi">3</span>
+
+        <span class="c1"># Numerical integration of reference TAC</span>
+        <span class="n">intrefTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+        <span class="c1"># Compute BP/DVR, R1, k2, k2a</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">TAC</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="p">):</span>
+            <span class="n">W</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="n">k</span><span class="p">,:])</span>
+
+            <span class="c1"># Numerical integration of target TAC</span>
+            <span class="n">intTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="n">TAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+            <span class="c1"># ----- Get DVR, BP -----</span>
+            <span class="c1"># Set up the weighted linear regression model</span>
+            <span class="c1"># based on Eq. 9 in Zhou et al.</span>
+            <span class="c1"># Per the recommendation in first paragraph on p. 979 of Zhou et al.,</span>
+            <span class="c1"># smoothed TAC is used in the design matrix, if provided.</span>
+            <span class="k">if</span> <span class="n">smoothTAC</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">intrefTAC</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span> <span class="o">-</span><span class="n">TAC</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">intrefTAC</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span> <span class="o">-</span><span class="n">smoothTAC</span><span class="p">[</span><span class="n">k</span><span class="p">,:]</span><span class="o">.</span><span class="n">flatten</span><span class="p">())))</span>
+
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">intTAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">residual</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">X</span> <span class="o">*</span> <span class="n">b</span>
+            <span class="n">noiseVar_eqDVR</span> <span class="o">=</span> <span class="n">residual</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">residual</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># unbiased estimator of noise variance</span>
+
+            <span class="n">DVR</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1">#R1 = b[1] / b[2]</span>
+            <span class="c1">#k2 = b[0] / b[2]</span>
+            <span class="n">BP</span> <span class="o">=</span> <span class="n">DVR</span> <span class="o">-</span> <span class="mi">1</span>
+
+            <span class="c1"># ----- Get R1 -----</span>
+            <span class="c1"># Set up the weighted linear regression model</span>
+            <span class="c1"># based on Eq. 8 in Zhou et al.</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="n">intrefTAC</span><span class="p">,</span><span class="o">-</span><span class="n">intTAC</span><span class="p">)))</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">TAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">residual</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">X</span> <span class="o">*</span> <span class="n">b</span>
+            <span class="n">noiseVar_eqR1</span> <span class="o">=</span> <span class="n">residual</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">residual</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># unbiased estimator of noise variance</span>
+
+            <span class="n">R1</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">k2</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">k2a</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;BP&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">BP</span> <span class="c1"># distinguish between BP estimated using smoothed v. unsmoothed TAC?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;R1&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">R1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2a&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2a</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;noiseVar_eqDVR&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">noiseVar_eqDVR</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;noiseVar_eqR1&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">noiseVar_eqR1</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+<div class="viewcode-block" id="SRTM_Zhou2003.refine_R1"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm.SRTM_Zhou2003.refine_R1">[docs]</a>    <span class="k">def</span> <span class="nf">refine_R1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smoothR1</span><span class="p">,</span> <span class="n">smoothk2</span><span class="p">,</span> <span class="n">smoothk2a</span><span class="p">,</span> <span class="n">h</span><span class="p">):</span>
+        <span class="c1"># Ridge regression to get better R1, k2, k2a estimates</span>
+        <span class="c1">#</span>
+        <span class="c1"># (smoothR1, smoothk2, smoothk2a) are the values to drive the estimates toward</span>
+        <span class="c1"># h is the diagonal elements of the matrix used to compute the weighted norm</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">smoothR1</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="n">smoothk2</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="n">smoothk2a</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;smoothR1, smoothk2, smoothk2a must be 1-D&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">smoothR1</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">smoothk2</span><span class="p">)</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">smoothk2a</span><span class="p">)</span><span class="o">==</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Length of smoothR1, smoothk2, smoothk2a must be </span><span class="se">\</span>
+<span class="s1">                             equal to the number of rows of TAC&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">h</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;h must be 2-D&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">h</span><span class="o">.</span><span class="n">shape</span><span class="o">==</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Number of rows of h must equal the number of rows of TAC, </span><span class="se">\</span>
+<span class="s1">                             and the number of columns of h must be 3&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Numerical integration of reference TAC</span>
+        <span class="n">intrefTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">TAC</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="p">):</span>
+            <span class="n">W</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="n">k</span><span class="p">,:])</span>
+
+            <span class="c1"># Numerical integration of target TAC</span>
+            <span class="n">intTAC</span> <span class="o">=</span> <span class="n">km_integrate</span><span class="p">(</span><span class="n">TAC</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+            <span class="c1"># ----- Get R1 incorporating spatial constraint -----</span>
+            <span class="c1"># Set up the ridge regression model</span>
+            <span class="c1"># based on Eq. 11 in Zhou et al.</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">,</span><span class="n">intrefTAC</span><span class="p">,</span><span class="o">-</span><span class="n">intTAC</span><span class="p">)))</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span><span class="n">TAC</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">H</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="n">k</span><span class="p">,:])</span>
+            <span class="n">b_sc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mat</span><span class="p">(</span> <span class="p">(</span><span class="n">smoothR1</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">smoothk2</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">smoothk2a</span><span class="p">[</span><span class="n">k</span><span class="p">])</span> <span class="p">)</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">X</span> <span class="o">+</span> <span class="n">H</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">W</span> <span class="o">*</span> <span class="n">y</span> <span class="o">+</span> <span class="n">H</span> <span class="o">*</span> <span class="n">b_sc</span><span class="p">)</span>
+
+            <span class="n">R1_lrsc</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">k2_lrsc</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">k2a_lrsc</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;R1_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">R1_lrsc</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2_lrsc</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2a_lrsc&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">k2a_lrsc</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div></div>
+
+<div class="viewcode-block" id="SRTM_Lammertsma1996"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm.SRTM_Lammertsma1996">[docs]</a><span class="k">class</span> <span class="nc">SRTM_Lammertsma1996</span><span class="p">(</span><span class="n">KineticModel</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute binding potential (BP) and relative delivery (R1) kinetic parameters</span>
+<span class="sd">    from dynamic PET data based on simplified reference tissue model (SRTM).</span>
+<span class="sd">    Reference:</span>
+<span class="sd">    Simplified reference tissue model for PET receptor studies.Lammertsma AA1,</span>
+<span class="sd">    Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="c1"># This class will compute the following results:</span>
+    <span class="n">result_names</span> <span class="o">=</span> <span class="p">[</span> <span class="c1"># estimated parameters</span>
+                    <span class="s1">&#39;BP&#39;</span><span class="p">,</span><span class="s1">&#39;R1&#39;</span><span class="p">,</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span>
+                    <span class="c1"># model fit indicators</span>
+                    <span class="s1">&#39;err&#39;</span><span class="p">,</span><span class="s1">&#39;mse&#39;</span><span class="p">,</span><span class="s1">&#39;fpe&#39;</span><span class="p">,</span><span class="s1">&#39;logl&#39;</span><span class="p">,</span><span class="s1">&#39;akaike&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="SRTM_Lammertsma1996.fit"><a class="viewcode-back" href="../../kineticmodel.html#kineticmodel.srtm.SRTM_Lammertsma1996.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="mi">4</span> <span class="c1"># 3 model parameters + noise variance</span>
+
+        <span class="k">def</span> <span class="nf">make_srtm_est</span><span class="p">(</span><span class="n">startActivity</span><span class="p">):</span>
+            <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            Wrapper to construct the SRTM TAC estimation function with a given</span>
+<span class="sd">            startActivity.</span>
+<span class="sd">            Args</span>
+<span class="sd">            ----</span>
+<span class="sd">                startActivity : determines initial condition for integration.</span>
+<span class="sd">                                See integrate in kineticmodel.py</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+
+            <span class="k">def</span> <span class="nf">srtm_est</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">BPnd</span><span class="p">,</span> <span class="n">R1</span><span class="p">,</span> <span class="n">k2</span><span class="p">):</span>
+                <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">                Compute fitted TAC given t, refTAC, BP, R1, k2.</span>
+
+<span class="sd">                Args</span>
+<span class="sd">                ----</span>
+<span class="sd">                    X : tuple where first element is t, and second element is intrefTAC</span>
+<span class="sd">                    BPnd : binding potential</span>
+<span class="sd">                    R1 : R1</span>
+<span class="sd">                    k2 : k2</span>
+<span class="sd">                &#39;&#39;&#39;</span>
+                <span class="n">t</span><span class="p">,</span> <span class="n">refTAC</span> <span class="o">=</span> <span class="n">X</span>
+
+                <span class="n">k2a</span><span class="o">=</span><span class="n">k2</span><span class="o">/</span><span class="p">(</span><span class="n">BPnd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+                <span class="c1"># Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of</span>
+                <span class="c1"># refTAC(t)*exp(k2at).</span>
+
+                <span class="n">integrant</span> <span class="o">=</span> <span class="n">refTAC</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">k2a</span><span class="o">*</span><span class="n">t</span><span class="p">)</span>
+                <span class="n">conv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k2a</span><span class="o">*</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="n">km_integrate</span><span class="p">(</span><span class="n">integrant</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">startActivity</span><span class="p">)</span>
+                <span class="n">TAC_est</span> <span class="o">=</span> <span class="n">R1</span><span class="o">*</span><span class="n">refTAC</span> <span class="o">+</span> <span class="p">(</span><span class="n">k2</span><span class="o">-</span><span class="n">R1</span><span class="o">*</span><span class="n">k2a</span><span class="p">)</span><span class="o">*</span><span class="n">conv</span>
+                <span class="k">return</span> <span class="n">TAC_est</span>
+            <span class="k">return</span> <span class="n">srtm_est</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refTAC</span><span class="p">)</span>
+        <span class="c1"># upper bounds for kinetic parameters in optimization</span>
+        <span class="n">BP_upper</span><span class="p">,</span> <span class="n">R1_upper</span><span class="p">,</span> <span class="n">k2_upper</span> <span class="o">=</span> <span class="p">(</span><span class="mf">20.</span><span class="p">,</span><span class="mf">10.</span><span class="p">,</span><span class="mf">2.</span><span class="p">)</span>
+
+        <span class="n">srtm_fun</span> <span class="o">=</span> <span class="n">make_srtm_est</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">startActivity</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">TAC</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TAC</span><span class="p">):</span>
+            <span class="n">popt</span><span class="p">,</span> <span class="n">pcov</span> <span class="o">=</span> <span class="n">curve_fit</span><span class="p">(</span><span class="n">srtm_fun</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">TAC</span><span class="p">,</span>
+                                   <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,[</span><span class="n">BP_upper</span><span class="p">,</span> <span class="n">R1_upper</span><span class="p">,</span> <span class="n">k2_upper</span><span class="p">]),</span>
+                                   <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="n">k</span><span class="p">,:]),</span> <span class="n">absolute_sigma</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">y_est</span> <span class="o">=</span> <span class="n">srtm_fun</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="o">*</span><span class="n">popt</span><span class="p">)</span>
+
+
+            <span class="c1"># random guess for init</span>
+            <span class="nb">iter</span> <span class="o">=</span> <span class="mi">10</span><span class="p">;</span>
+            <span class="n">popt_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="nb">iter</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span>
+            <span class="n">mse_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="nb">iter</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">iter</span><span class="p">):</span>
+                <span class="n">p0</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="mf">0.1</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span><span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.1</span><span class="p">])</span> <span class="c1"># BP, R1, k2</span>
+                <span class="n">popt</span><span class="p">,</span><span class="n">pcov</span> <span class="o">=</span> <span class="n">curve_fit</span><span class="p">(</span><span class="n">srtm_fun</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">TAC</span><span class="p">,</span>
+                                       <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,[</span><span class="n">BP_upper</span><span class="p">,</span> <span class="n">R1_upper</span><span class="p">,</span> <span class="n">k2_upper</span><span class="p">]),</span>
+                                       <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="n">k</span><span class="p">,:]),</span> <span class="n">absolute_sigma</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                       <span class="n">p0</span><span class="o">=</span><span class="n">p0</span><span class="p">)</span>
+                <span class="n">popt_list</span><span class="p">[</span><span class="n">i</span><span class="p">,]</span> <span class="o">=</span> <span class="n">popt</span>
+                <span class="n">y_est</span> <span class="o">=</span> <span class="n">srtm_fun</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="o">*</span><span class="n">popt</span><span class="p">)</span>
+                <span class="n">sos</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">TAC</span><span class="o">-</span><span class="n">y_est</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+                <span class="n">mse_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span>  <span class="n">sos</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># 3 par + std err</span>
+
+            <span class="n">min_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">mse_list</span><span class="p">)</span>
+            <span class="n">popt_final</span> <span class="o">=</span> <span class="n">popt_list</span><span class="p">[</span><span class="n">min_index</span><span class="p">,]</span>
+
+            <span class="n">y_est</span> <span class="o">=</span> <span class="n">srtm_fun</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="o">*</span><span class="n">popt_final</span><span class="p">)</span>
+
+            <span class="n">sos</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">TAC</span><span class="o">-</span><span class="n">y_est</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+            <span class="n">err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sos</span><span class="p">)</span><span class="o">/</span><span class="n">n</span>
+            <span class="n">mse</span> <span class="o">=</span>  <span class="n">sos</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="c1"># 3 par + std err</span>
+            <span class="n">fpe</span> <span class="o">=</span>  <span class="n">sos</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="n">m</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="n">m</span><span class="p">)</span>
+
+            <span class="n">SigmaSqr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">(</span> <span class="n">TAC</span><span class="o">-</span><span class="n">y_est</span> <span class="p">)</span>
+            <span class="n">logl</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span><span class="o">*</span><span class="n">n</span><span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span> <span class="mi">2</span><span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">SigmaSqr</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span><span class="o">*</span><span class="n">sos</span><span class="o">/</span><span class="n">SigmaSqr</span>
+            <span class="n">akaike</span> <span class="o">=</span> <span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">logl</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">m</span> <span class="c1"># 4 parameters: 3 model parameters + noise variance</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;BP&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;R1&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;k2&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">popt</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;err&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">err</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;mse&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">mse</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;fpe&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">fpe</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;logl&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span><span class="o">=</span> <span class="n">logl</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;akaike&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">akaike</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">kineticmodel 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.6.
+    </div>
+  </body>
+</html>
