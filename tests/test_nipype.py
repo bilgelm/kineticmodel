@@ -5,19 +5,23 @@ try:
     import unittest
 
     from kineticmodel.nipype import KineticModel
+    from kineticmodel.datasets import pet4D_file, timing_file, refRegionMask_file
     from nipype.pipeline.engine import Node
 
     class TestKineticModelNipype(unittest.TestCase):
         def setUp(self):
             # read in image from examples/data
             #self.pet4D_file = os.path.abspath('examples/data/input.mni305.2mm.sm6.nii.gz')
-            self.pet4D_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                           os.pardir,'examples/data/input.mni305.2mm.sm6.nii.gz')
-            self.timing_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                            os.pardir,'examples/data/info_tim.csv')
-            self.refRegionMaskFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                  os.pardir,'examples/data/cereb.mni305.2mm.nii.gz')
-
+            #self.pet4D_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+            #                               os.pardir,'examples/data/input.mni305.2mm.sm6.nii.gz')
+            #self.timing_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+            #                                os.pardir,'examples/data/info_tim.csv')
+            #self.refRegionMaskFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+            #                                      os.pardir,'examples/data/cereb.mni305.2mm.nii.gz')
+            self.pet4D_file = pet4D_file
+            self.timing_file = timing_file
+            self.refRegionMaskFile = refRegionMask_file
+            
             self.time_unit = 'min'
             self.startActivity = 'flat'
             self.weights = 'frameduration'
