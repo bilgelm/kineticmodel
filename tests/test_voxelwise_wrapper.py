@@ -11,6 +11,7 @@ class TestKineticModelVoxelwise(unittest.TestCase):
                                   os.pardir,'examples/data/input.mni305.2mm.sm6.nii.gz')
         timing_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                    os.pardir,'examples/data/info_tim.csv')
+        print(timing_file)
         self.ti = ti_load(pet4D_file, timing_file)
         self.refRegionMaskFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                               os.pardir,'examples/data/cereb.mni305.2mm.nii.gz')
