@@ -1,10 +1,10 @@
 import os
 import nibabel as nib
-from nipype.interfaces.base import TraitedSpec, File, traits, BaseInterface, BaseInterfaceInputSpec, OutputMultiPath
+from nipype.interfaces.base import TraitedSpec, File, traits, BaseInterface, BaseInterfaceInputSpec, OutputMultiPath, isdefined
 from nipype.utils.filemanip import split_filename
 
 from temporalimage import load as ti_load
-from .. import kineticmodel
+import kineticmodel
 
 class KineticModelInputSpec(BaseInterfaceInputSpec):
     model = traits.Enum('SRTM_Zhou2003','SRTM_Lammertsma1996',
@@ -14,7 +14,7 @@ class KineticModelInputSpec(BaseInterfaceInputSpec):
     frameTimingCsvFile = File(exists=True, desc='csv file listing the duration of each time frame in the 4D image, in minutes', mandatory=True)
     refRegionMaskFile = File(exists=True, desc='Reference region mask', mandatory=True)
     startTime = traits.Float(0.0, desc='minute into the time series image at which to start computing the parametric images, inclusive', mandatory=False)
-    endTime = traits.Float(desc='minute into the time series image at which to stop computing the parametric images, exclusive', mandatory=True)
+    endTime = traits.Float(desc='minute into the time series image at which to stop computing the parametric images, exclusive', mandatory=False)
 
     time_unit = traits.Enum('min','s', desc='one of: min, s', mandatory=True)
     startActivity = traits.Enum('flat','increasing','zero', desc='one of: flat, increasing, zero', mandatory=True)
@@ -47,12 +47,33 @@ class KineticModel(BaseInterface):
         timeSeriesImgFile = self.inputs.timeSeriesImgFile
         refRegionMaskFile = self.inputs.refRegionMaskFile
         frameTimingCsvFile = self.inputs.frameTimingCsvFile
-        startTime = self.inputs.startTime
         endTime = self.inputs.endTime
+
+        ti = ti_load(timeSeriesImgFile, frameTimingCsvFile)
+
+        if isdefined(self.inputs.startTime):
+            startTime = self.inputs.startTime
+        else:
+            startTime = ti.get_startTime()
+
+        if isdefined(self.inputs.endTime):
+            endTime = self.inputs.EndTime
+        else:
+            endTime = ti.get_endTime()
+
+        if isdefined(self.inputs.halflife):
+            halflife = self.inputs.halflife
+        else:
+            halflife = None
+
+        if isdefined(self.inputs.fwhm):
+            fwhm = self.inputs.fwhm
+        else:
+            fwhm = None
 
         _, base, _ = split_filename(timeSeriesImgFile)
 
-        ti = ti_load(timeSeriesImgFile, frameTimingCsvFile).extractTime(startTime, endTime)
+        ti = ti.extractTime(startTime, endTime)
         self.modStartTime = ti.get_startTime()
         self.modEndTime = ti.get_endTime()
 
@@ -62,9 +83,9 @@ class KineticModel(BaseInterface):
                                             time_unit=self.inputs.time_unit,
                                             startActivity=self.inputs.startActivity,
                                             weights=self.inputs.weights,
-                                            halflife=self.inputs.halflife,
+                                            halflife=halflife,
                                             #Trues=self.inputs.Trues,
-                                            fwhm=self.inputs.fwhm)
+                                            fwhm=fwhm)
 
         for result_name in class_.result_names:
             res_img = nib.Nifti1Image(results_img[result_name], ti.affine, ti.header)
