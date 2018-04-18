@@ -19,8 +19,8 @@ class TestKineticModelVoxelwise(TestCase):
         print(os.listdir(os.pardir))
         print(os.path.dirname(__file__))
         print(os.listdir(os.path.dirname(__file__)))
-        print(os.listdir(os.path.join(os.pardir,'kineticmodel')))
-        print(os.listdir(os.path.join(os.pardir,'kineticmodel','datasets')))
+        print(os.listdir(os.path.join(os.pardir,'repo','kineticmodel')))
+        print(os.listdir(os.path.join(os.pardir,'repo','kineticmodel','datasets')))
 
         # check if files exist
 
