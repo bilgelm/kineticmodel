@@ -13,6 +13,14 @@ class TestKineticModelVoxelwise(TestCase):
         #timing_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
         #                           os.pardir,'examples/data/info_tim.csv')
         print('test_voxelwise pet4D_file:' + pet4D_file)
+        print(os.path.isfile(pet4D_file))
+        print('test_voxelwise timing_file:' + timing_file)
+        print(os.path.isfile(timing_file))
+        print(os.listdir(os.pardir))
+        print(os.listdir(os.path.join(os.pardir,'datasets')))
+
+        # check if files exist
+
         self.ti = ti_load(pet4D_file, timing_file)
         #self.refRegionMaskFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),
         #                                      os.pardir,'examples/data/cereb.mni305.2mm.nii.gz')
