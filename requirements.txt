@@ -1,2 +1,2 @@
 ddt
-git+http://github.com/bilgelm/temporalimage
+git+http://github.com/bilgelm/temporalimage@master
