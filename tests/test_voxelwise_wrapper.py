@@ -17,7 +17,7 @@ class TestKineticModelVoxelwise(TestCase):
         print('test_voxelwise timing_file:' + timing_file)
         print(os.path.isfile(timing_file))
         print(os.listdir(os.pardir))
-        print(os.listdir(__file__))
+        print(os.listdir(os.path.dirname(__file__)))
         print(os.listdir(os.path.join(os.path.dirname(__file__),'kineticmodel')))
         print(os.listdir(os.path.join(os.path.dirname(__file__),'kineticmodel','datasets')))
 
