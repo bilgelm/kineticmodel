@@ -192,12 +192,14 @@ class SRTM_Lammertsma1996(KineticModel):
                 t, refTAC = X
 
                 k2a=k2/(BPnd+1)
-                # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
-                # refTAC(t)*exp(k2at).
+                # Convolution of reference TAC and exp(-k2a*t) = exp(-k2a*t) * Numerical integration of
+                # refTAC(t)*exp(k2a*t).
 
-                integrant = refTAC * np.exp(k2a*t)
-                conv = np.exp(-k2a*t) * km_integrate(integrant,t,startActivity)
+                exp_k2a_t = np.exp(k2a*t)
+                integrant = refTAC * exp_k2a_t
+                conv = km_integrate(integrant,t,startActivity) / exp_k2a_t
                 TAC_est = R1*refTAC + (k2-R1*k2a)*conv
+
                 return TAC_est
             return srtm_est
 
@@ -212,7 +214,6 @@ class SRTM_Lammertsma1996(KineticModel):
                                    bounds=(0,[BP_upper, R1_upper, k2_upper]),
                                    sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
             y_est = srtm_fun(X, *popt)
-
 
             # random guess for init
             iter = 10;
