@@ -1,9 +1,8 @@
-﻿import math
 import numpy as np
 import numpy.matlib as mat
 from scipy.linalg import solve
 from scipy.ndimage import gaussian_filter
-from scipy.optimize import curve_fit
+from scipy.optimize import basinhopping
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
 
@@ -160,9 +159,9 @@ class SRTM_Lammertsma1996(KineticModel):
 
     # This class will compute the following results:
     result_names = [ # estimated parameters
-                    'BP','R1','k2',
+                    'BP','R1','k2']#,
                     # model fit indicators
-                    'err','mse','fpe','logl','akaike']
+                    #'akaike']
 
     def fit(self):
         n = len(self.t)
@@ -201,55 +200,25 @@ class SRTM_Lammertsma1996(KineticModel):
                 TAC_est = R1*refTAC + (k2-R1*k2a)*conv
 
                 return TAC_est
+
             return srtm_est
 
         X = (self.t, self.refTAC)
+
         # upper bounds for kinetic parameters in optimization
         BP_upper, R1_upper, k2_upper = (20.,10.,2.)
 
         srtm_fun = make_srtm_est(self.startActivity)
 
         for k, TAC in enumerate(self.TAC):
-            popt, pcov = curve_fit(srtm_fun, X, TAC,
-                                   bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                   sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
-            y_est = srtm_fun(X, *popt)
+            w = self.weights[k,:]
+            def energy_fun(kineticparams):
+                return np.sum(w * np.square(TAC - srtm_fun(X, *kineticparams)))
 
-            # random guess for init
-            iter = 10;
-            popt_list = np.zeros([iter,3])
-            mse_list = np.zeros([iter])
-            for i in range(iter):
-                p0 = (1+0.1*np.random.randn(3))* np.array([2.0,1.0,0.1]) # BP, R1, k2
-                popt,pcov = curve_fit(srtm_fun, X, TAC,
-                                       bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                       sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False,
-                                       p0=p0)
-                popt_list[i,] = popt
-                y_est = srtm_fun(X, *popt)
-                sos=np.sum(np.power(TAC-y_est,2))
-                mse_list[i] =  sos / (n-m) # 3 par + std err
+            minimizer_kwargs = dict(method="L-BFGS-B",
+                                    bounds=[(0,BP_upper), (0, R1_upper), (0, k2_upper)])
+            res = basinhopping(energy_fun, x0=np.array([1.,1.,0.1]), minimizer_kwargs=minimizer_kwargs)
 
-            min_index = np.argmin(mse_list)
-            popt_final = popt_list[min_index,]
-
-            y_est = srtm_fun(X, *popt_final)
-
-            sos=np.sum(np.power(TAC-y_est,2))
-            err = np.sqrt(sos)/n
-            mse =  sos / (n-m) # 3 par + std err
-            fpe =  sos * (n+m) / (n-m)
-
-            SigmaSqr = np.var( TAC-y_est )
-            logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
-            akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
-
-            self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = popt
-
-            self.results['err'][k] = err
-            self.results['mse'][k] = mse
-            self.results['fpe'][k] = fpe
-            self.results['logl'][k]= logl
-            self.results['akaike'][k] = akaike
+            self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = res.x
 
         return self
