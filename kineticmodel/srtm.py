@@ -5,7 +5,6 @@ from scipy.ndimage import gaussian_filter
 from scipy.optimize import basinhopping, minimize_scalar
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
-from tqdm import tqdm
 
 class SRTM_Zhou2003(KineticModel):
     '''
@@ -229,7 +228,7 @@ class SRTM_Gunn1997(KineticModel):
 
     def fit(self):
         print(self.TAC.shape)
-        for k, TAC in tqdm(enumerate(self.TAC)):
+        for k, TAC in enumerate(self.TAC):
             W = mat.diag(self.weights[k,:])
             y = np.mat(TAC).T
 
