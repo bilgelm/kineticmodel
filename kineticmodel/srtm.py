@@ -187,12 +187,15 @@ class SRTM_Lammertsma1996(KineticModel):
                     X : tuple where first element is t, and second element is intrefTAC
                     BPnd : binding potential
                     R1 : R1
-                    k2 : k2
+                    k2 : k2 (1/min)
                 '''
+                # equation C(t)=R1 * Cr(t) + [k2 - R1*k2a] * Cr(t) conv exp(-k2a*t)
+                # k2a=k2/(BPnd+1)
+                # b1=R1; b2=[k2 - R1*k2a];
                 t, refTAC = X
 
                 k2a=k2/(BPnd+1)
-                # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
+                # Convolution of reference TAC and exp(-k2at) = exp(-k2at) * Numerical integration of
                 # refTAC(t)*exp(k2at).
 
                 integrant = refTAC * np.exp(k2a*t)
@@ -208,10 +211,10 @@ class SRTM_Lammertsma1996(KineticModel):
         srtm_fun = make_srtm_est(self.startActivity)
 
         for k, TAC in enumerate(self.TAC):
-            popt, pcov = curve_fit(srtm_fun, X, TAC,
-                                   bounds=(0,[BP_upper, R1_upper, k2_upper]),
-                                   sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
-            y_est = srtm_fun(X, *popt)
+        #   popt, pcov = curve_fit(srtm_fun, X, TAC,
+        #                         bounds=(0,[BP_upper, R1_upper, k2_upper]),
+        #                         sigma=1/np.sqrt(self.weights[k,:]), absolute_sigma=False)
+        #   y_est = srtm_fun(X, *popt)
 
 
             # random guess for init
@@ -244,6 +247,114 @@ class SRTM_Lammertsma1996(KineticModel):
             akaike = -2*logl + 2*m # 4 parameters: 3 model parameters + noise variance
 
             self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = popt
+
+            self.results['err'][k] = err
+            self.results['mse'][k] = mse
+            self.results['fpe'][k] = fpe
+            self.results['logl'][k]= logl
+            self.results['akaike'][k] = akaike
+
+        return self
+
+class SRTM2_Lammertsma1996(KineticModel):
+    '''
+    Compute binding potential (BP) and relative delivery (R1) kinetic parameters
+    from dynamic PET data based on simplified reference tissue model with fixed
+    k2p (SRTM2). k2p is determined by high binding region using SRTM_Lammertsma1996.
+    '''
+    # This class will compute the following results:
+    result_names = [ # estimated parameters
+                    'BP','R1',
+                    # model fit indicators
+                    'err','mse','fpe','logl','akaike']
+
+    def fit(self, Highbinding):
+        n = len(self.t)
+        m = 3 # 2 model parameters + noise variance
+
+        def make_srtm2_est(startActivity, k2p):
+            '''
+            Wrapper to construct the SRTM TAC estimation function with a given
+            startActivity.
+            Args
+            ----
+                startActivity : determines initial condition for integration.
+                                See integrate in kineticmodel.py
+                k2p (1/min): k2 of reference region estimated by SRTM_Lammertsma1996
+            '''
+
+            def srtm2_est(X, BPnd, R1):
+                '''
+                Compute fitted TAC given t, refTAC, BP, R1, k2p.
+
+                Args
+                ----
+                    X : tuple where first element is t, and second element is intrefTAC
+                    BPnd : binding potential
+                    R1 : R1
+
+                '''
+                t, refTAC = X
+                # C(t)=R1 * Cr(t) + R1 * [k2p - k2a] * Cr(t) conv exp(-k2a*t)
+                # BPnd=R1*k2p/k2a-1;
+                # k2a=R1*k2p/(BPnd+1)
+                # b1=R1; b2=R1 *[k2' - k2a];
+                k2a=R1*k2p/(BPnd+1)
+                # Convolution of reference TAC and exp(-k2a) = exp(-k2a) * Numerical integration of
+                # refTAC(t)*exp(k2at).
+
+                integrant = refTAC * np.exp(k2a*t)
+                conv = np.exp(-k2a*t) * km_integrate(integrant,t,startActivity)
+                TAC_est = R1*refTAC + R1*(k2p-k2a)*conv
+                return TAC_est
+            return srtm2_est
+        # upper bounds for kinetic parameters in optimization
+        BP_upper, R1_upper= (20.,10.)
+        X = (self.t, self.refTAC)
+        # determine k2p using srtm with highbinding and reference region
+        mdl_srtm = SRTM_Lammertsma1996(t=self.t, dt=self.dt, TAC=Highbinding, refTAC=self.refTAC,
+        time_unit='min', startActivity=self.startActivity)
+        # fit model
+        mdl_srtm.fit();
+        # get model results
+        k2p = mdl_srtm.results['k2']/mdl_srtm.results['R1']
+        # print("k2=\n{}".format(mdl_srtm.results['k2']))
+        # print("R1=\n{}".format(mdl_srtm.results['R1']))
+        # print("k2p=\n{}".format(k2p))
+        srtm2_fun = make_srtm2_est(self.startActivity, k2p)
+
+        for k, TAC in enumerate(self.TAC):
+            # random guess for init
+            iter = 10;
+            popt_list = np.zeros([iter,2])
+            mse_list = np.zeros([iter])
+            for i in range(iter):
+                p0 = (1+0.1*np.random.randn(2))* np.array([2.0,1.0]) # BP, R1
+                popt,pcov = curve_fit(srtm2_fun, X, TAC,
+                                       bounds=(0,[BP_upper, R1_upper]),
+                                       sigma=1/np.sqrt(self.dt), absolute_sigma=False,
+                                       p0=p0)
+                popt_list[i,] = popt
+                #print("popt=\n{}".format(popt))
+                y_est = srtm2_fun(X, *popt)
+                sos=np.sum(np.power(TAC-y_est,2))
+                mse_list[i] =  sos / (n-m) # 2 par + std err
+
+            min_index = np.argmin(mse_list)
+            popt_final = popt_list[min_index,]
+
+            y_est = srtm2_fun(X, *popt_final)
+
+            sos=np.sum(np.power(TAC-y_est,2))
+            err = np.sqrt(sos)/n
+            mse =  sos / (n-m) # 3 par + std err
+            fpe =  sos * (n+m) / (n-m)
+
+            SigmaSqr = np.var( TAC-y_est )
+            logl = -0.5*n* math.log( 2* math.pi * SigmaSqr) - 0.5*sos/SigmaSqr
+            akaike = -2*logl + 2*m # 3 parameters: 2 model parameters + noise variance
+
+            self.results['BP'][k], self.results['R1'][k] = popt
 
             self.results['err'][k] = err
             self.results['mse'][k] = mse
