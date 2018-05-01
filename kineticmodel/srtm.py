@@ -2,9 +2,10 @@ import numpy as np
 import numpy.matlib as mat
 from scipy.linalg import solve
 from scipy.ndimage import gaussian_filter
-from scipy.optimize import basinhopping
+from scipy.optimize import basinhopping, minimize_scalar
 from kineticmodel import KineticModel
 from kineticmodel import integrate as km_integrate
+from tqdm import tqdm
 
 class SRTM_Zhou2003(KineticModel):
     '''
@@ -190,7 +191,7 @@ class SRTM_Lammertsma1996(KineticModel):
                 '''
                 t, refTAC = X
 
-                k2a=k2/(BPnd+1)
+                k2a = k2/(BPnd+1)
                 # Convolution of reference TAC and exp(-k2a*t) = exp(-k2a*t) * Numerical integration of
                 # refTAC(t)*exp(k2a*t).
 
@@ -220,5 +221,43 @@ class SRTM_Lammertsma1996(KineticModel):
             res = basinhopping(energy_fun, x0=np.array([1.,1.,0.1]), minimizer_kwargs=minimizer_kwargs)
 
             self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = res.x
+
+        return self
+
+class SRTM_Gunn1997(KineticModel):
+    result_names = ['BP','R1','k2']
+
+    def fit(self):
+        print(self.TAC.shape)
+        for k, TAC in tqdm(enumerate(self.TAC)):
+            W = mat.diag(self.weights[k,:])
+            y = np.mat(TAC).T
+
+            def energy_fun(theta3):
+                exp_theta3_t = np.exp(np.asscalar(theta3)*self.t)
+                integrant = self.refTAC * exp_theta3_t
+                conv = km_integrate(integrant,self.t,self.startActivity) / exp_theta3_t
+                X = np.mat(np.column_stack((self.refTAC, conv)))
+                thetas = solve(X.T * W * X, X.T * W * y)
+                residual = y - X * thetas
+                rss = residual.T * W * residual
+                return rss
+
+            res = minimize_scalar(energy_fun, bounds=(0.06, 0.6), method='bounded', options=dict(xatol=1e-1))
+            theta3 = np.asscalar(res.x)
+
+            exp_theta3_t = np.exp(theta3*self.t)
+            integrant = self.refTAC * exp_theta3_t
+            conv = km_integrate(integrant,self.t,self.startActivity) / exp_theta3_t
+            X = np.mat(np.column_stack((self.refTAC, conv)))
+            thetas = solve(X.T * W * X, X.T * W * y)
+
+            R1 = thetas[0]
+            k2 = thetas[1] + R1*theta3
+            BP = k2 / theta3 - 1
+
+            self.results['BP'][k] = BP
+            self.results['R1'][k] = R1
+            self.results['k2'][k] = k2
 
         return self

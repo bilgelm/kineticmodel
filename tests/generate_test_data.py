@@ -24,7 +24,7 @@ def generate_fakeTAC_SRTM(BP,R1):
         K1 = R1 * Kref1
 
         DVR = 1+BP
-        kref2 = 1.0
+        kref2 = 0.3
         k2a = kref2 * R1 / DVR
 
         Cp = y[0]
