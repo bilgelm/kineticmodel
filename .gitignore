@@ -7,3 +7,6 @@
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
 /*.egg
+examples/.ipynb_checkpoints/example_srtm-checkpoint.ipynb
+examples/.ipynb_checkpoints/srtm_example_Pmod-checkpoint.ipynb
+examples/data/input.mni305.2mm.sm6.nii.gz
