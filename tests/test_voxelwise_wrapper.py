@@ -42,23 +42,3 @@ class TestKineticModelVoxelwise(TestCase):
         R1_file = os.path.abspath('tests/test_outputs/R1.mni305.2mm.sm6.nii.gz')
         nib.save(R1_img, R1_file)
         '''
-
-    def test_srtm_gunn1997_voxelwise(self):
-        results_img = SRTM_Gunn1997.volume_wrapper(ti=self.ti,
-                                    refRegionMaskFile=self.refRegionMaskFile,
-                                    time_unit=self.time_unit,
-                                    startActivity=self.startActivity,
-                                    weights=self.weights)
-
-        '''
-        # save BP, R1 images
-        BP_img = nib.Nifti1Image(results_img['BP'], affine=self.ti.affine,
-                                 header=self.ti.header, extra=self.ti.extra)
-        BP_file = os.path.abspath('tests/test_outputs/BPgunn.mni305.2mm.sm6.nii.gz')
-        nib.save(BP_img, BP_file)
-
-        R1_img = nib.Nifti1Image(results_img['R1'], affine=self.ti.affine,
-                                 header=self.ti.header, extra=self.ti.extra)
-        R1_file = os.path.abspath('tests/test_outputs/R1gunn.mni305.2mm.sm6.nii.gz')
-        nib.save(R1_img, R1_file)
-        '''
