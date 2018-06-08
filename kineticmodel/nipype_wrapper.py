@@ -1,7 +1,9 @@
 import os
 import nibabel as nib
-from nipype.interfaces.base import TraitedSpec, File, traits, BaseInterface, BaseInterfaceInputSpec, OutputMultiPath, isdefined
+from nipype.interfaces.base import TraitedSpec, DynamicTraitedSpec, File, traits, \
+                                   BaseInterface, BaseInterfaceInputSpec, isdefined
 from nipype.utils.filemanip import split_filename
+from nipype.interfaces.io import add_traits
 
 from temporalimage import load as ti_load
 import kineticmodel
@@ -27,11 +29,6 @@ class KineticModelInputSpec(BaseInterfaceInputSpec):
     fwhm = traits.Float(desc='Full width at half max (in mm) for Gaussian smoothing (required for SRTM_Zhou2003)',
                         mandatory=False)
 
-class KineticModelOutputSpec(TraitedSpec):
-    startTime = traits.Float(desc='possibly modified start time')
-    endTime = traits.Float(desc='possibly modified end time')
-    out_files = OutputMultiPath(File(exists=True))
-
 class KineticModel(BaseInterface):
     """
     Simplified Reference Tissue Model (SRTM) implemented using
@@ -40,7 +37,7 @@ class KineticModel(BaseInterface):
     """
 
     input_spec = KineticModelInputSpec
-    output_spec = KineticModelOutputSpec
+    output_spec = DynamicTraitedSpec
 
     def _run_interface(self, runtime):
         model = self.inputs.model
@@ -94,19 +91,22 @@ class KineticModel(BaseInterface):
 
         return runtime
 
+    def _add_output_traits(self, base):
+        class_ = getattr(kineticmodel, self.inputs.model)
+        return add_traits(base, class_.result_names)
+
+    def _outputs(self):
+        return self._add_output_traits(super(KineticModel, self)._outputs())
+
     def _list_outputs(self):
         outputs = self._outputs().get()
         model = self.inputs.model
         fname = self.inputs.timeSeriesImgFile
         _, base, _ = split_filename(fname)
 
-        outputs['startTime'] = self.modStartTime
-        outputs['endTime'] = self.modEndTime
-
         class_ = getattr(kineticmodel, model)
 
-        outputs['out_files'] = []
         for result_name in class_.result_names:
-            outputs['out_files'] += [os.path.abspath(base+'_'+'{:02.2f}'.format(self.modEndTime)+'min_'+result_name+'.nii.gz')]
+            outputs[result_name] = os.path.abspath(base+'_'+'{:02.2f}'.format(self.modEndTime)+'min_'+result_name+'.nii.gz')
 
         return outputs
