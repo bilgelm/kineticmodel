@@ -54,7 +54,7 @@ class KineticModel(BaseInterface):
             startTime = ti.get_startTime()
 
         if isdefined(self.inputs.endTime):
-            endTime = self.inputs.EndTime
+            endTime = self.inputs.endTime
         else:
             endTime = ti.get_endTime()
 
