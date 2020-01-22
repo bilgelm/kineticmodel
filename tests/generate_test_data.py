@@ -52,9 +52,9 @@ def generate_fakeTAC_SRTM(BP,R1):
     # number of time points
     numODEpts = 500
 
-    t_ODE = np.linspace(frameStart[0].magnitude, frameEnd[-1].magnitude,
+    t_ODE = np.linspace(frameStart[0], frameEnd[-1],
                         numODEpts)
-    y = odeint(model,y0,t_ODE,args=(BP,R1))
+    y = odeint(model,y0,t_ODE.magnitude,args=(BP,R1))
 
     # "Digitize" this curve
     Cref = np.zeros(len(frameMidPoint))
