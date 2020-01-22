@@ -1,4 +1,4 @@
-from kineticmodel import SRTM_Zhou2003, SRTM_Gunn1997
+from kineticmodel import SRTM_Zhou2003
 from temporalimage import load as ti_load
 import nibabel as nib
 import os
@@ -7,17 +7,8 @@ from kineticmodel.datasets import pet4D_file, timing_file, refRegionMask_file
 
 class TestKineticModelVoxelwise(TestCase):
     def setUp(self):
-        # read in image from examples/data
-        #pet4D_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-        #                          os.pardir,'examples/data/input.mni305.2mm.sm6.nii.gz')
-        #timing_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-        #                           os.pardir,'examples/data/info_tim.csv')
-
         self.ti = ti_load(pet4D_file, timing_file)
-        #self.refRegionMaskFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-        #                                      os.pardir,'examples/data/cereb.mni305.2mm.nii.gz')
         self.refRegionMaskFile = refRegionMask_file
-        self.time_unit = 'min'
         self.startActivity = 'flat'
         self.weights = 'frameduration'
         self.fwhm = 4
@@ -25,7 +16,6 @@ class TestKineticModelVoxelwise(TestCase):
     def test_srtm_zhou2003_voxelwise(self):
         results_img = SRTM_Zhou2003.volume_wrapper(ti=self.ti,
                                     refRegionMaskFile=self.refRegionMaskFile,
-                                    time_unit=self.time_unit,
                                     startActivity=self.startActivity,
                                     weights=self.weights,
                                     fwhm=self.fwhm)

@@ -3,21 +3,28 @@ def generate_fakeTAC_SRTM(BP,R1):
 
     import numpy as np
     from scipy.integrate import odeint
+    from temporalimage import Quantity
 
-    frameStart = np.array([0,
-                           0.25, 0.5, 0.75, 1.0,
-                           1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-                           6, 7, 8, 9, 10, 11, 12, 13, 14,
-                           17, 20,
-                           25, 30, 35, 40, 45, 50, 55, 60, 65, 70])
-    frameEnd = np.append(frameStart[1:], frameStart[-1]+10)
+    frameStart = Quantity(np.array([0,
+                                    0.25, 0.5, 0.75, 1.0,
+                                    1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
+                                    6, 7, 8, 9, 10, 11, 12, 13, 14,
+                                    17, 20,
+                                    25, 30, 35, 40, 45, 50, 55, 60, 65, 70]),
+                           'minute')
+    frameEnd = Quantity(np.array([0.25, 0.5, 0.75, 1.0,
+                                  1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
+                                  6, 7, 8, 9, 10, 11, 12, 13, 14,
+                                  17, 20,
+                                  25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80]),
+                        'minute')
     frameDuration = frameEnd - frameStart
     frameMidPoint = 0.5*(frameStart+frameEnd)
 
     def model(y,t,BP,R1):
-        # R1 = K1 / Kref1
-        # BP = DVR - 1
-
+        '''
+        ODE describing SRTM
+        '''
         plasma_rate = -0.03
 
         Kref1 = 1.0
@@ -45,7 +52,8 @@ def generate_fakeTAC_SRTM(BP,R1):
     # number of time points
     numODEpts = 500
 
-    t_ODE = np.linspace(frameStart[0],frameEnd[-1],numODEpts)
+    t_ODE = np.linspace(frameStart[0].magnitude, frameEnd[-1].magnitude,
+                        numODEpts)
     y = odeint(model,y0,t_ODE,args=(BP,R1))
 
     # "Digitize" this curve

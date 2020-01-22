@@ -8,13 +8,13 @@ from kineticmodel import integrate as km_integrate
 
 class SRTM_Zhou2003(KineticModel):
     '''
-    Compute binding potential (BP) and relative delivery (R1) kinetic parameters
-    from dynamic PET data based on simplified reference tissue model (SRTM).
-    The nonlinear SRTM equations are linearized using integrals of time
-    activity curves (TACs) of the reference and target tissues. Kinetic
+    Compute distribution volume ratio (DVR) and relative delivery (R1) kinetic
+    parameters from dynamic PET data based on a simplified reference tissue
+    model (SRTM). The nonlinear SRTM equations are linearized using integrals of
+    time activity curves (TACs) of the reference and target tissues. Kinetic
     parameters are then estimated by weighted linear regression (WLR).
     If provided, the spatially smoothed TAC of the target region is used in
-    the computation of BP as part of the linear regression with spatial
+    the computation of DVR as part of the linear regression with spatial
     constraint (LRSC) approach.
 
     To obtain the R1 estimate that incorporates spatial smoothness based on
@@ -30,12 +30,20 @@ class SRTM_Zhou2003(KineticModel):
     # This class will compute the following results:
     result_names = [ # estimated parameters
                     'BP',
+                    'DVR',
                     'R1','k2','k2a',
                     'R1_lrsc','k2_lrsc','k2a_lrsc',
                     # model fit indicators
                     'noiseVar_eqDVR','noiseVar_eqR1']
 
     def fit(self, smoothTAC=None):
+        '''
+        Estimate parameters of the SRTM Zhou 2003 model.
+
+        Args:
+            smoothTAC (numpy.ndarray): optional. 1- or 2-D array, where each row
+                corresponds to a (spatially) smoothed time activity curve
+        '''
         if smoothTAC is not None:
             if smoothTAC.ndim==1:
                 if not len(smoothTAC)==len(self.t):
@@ -61,20 +69,21 @@ class SRTM_Zhou2003(KineticModel):
             # Numerical integration of target TAC
             intTAC = km_integrate(TAC,self.t,self.startActivity)
 
-            # ----- Get DVR, BP -----
+            # ----- Get DVR -----
             # Set up the weighted linear regression model
             # based on Eq. 9 in Zhou et al.
             # Per the recommendation in first paragraph on p. 979 of Zhou et al.,
             # smoothed TAC is used in the design matrix, if provided.
             if smoothTAC is None:
-                X = np.mat(np.column_stack((intrefTAC, self.refTAC, -TAC)))
+                X = np.column_stack((intrefTAC, self.refTAC, -TAC))
             else:
-                X = np.mat(np.column_stack((intrefTAC, self.refTAC, -smoothTAC[k,:].flatten())))
+                X = np.column_stack((intrefTAC, self.refTAC, -smoothTAC[k,:].flatten()))
 
-            y = np.mat(intTAC).T
-            b = solve(X.T * W * X, X.T * W * y)
-            residual = y - X * b
-            noiseVar_eqDVR = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
+            y = intTAC
+            b = solve(X.T @ W @ X, X.T @ W @ y)
+            residual = y - X @ b
+            # unbiased estimator of noise variance
+            noiseVar_eqDVR = residual.T @ W @ residual / (n-m)
 
             DVR = b[0]
             #R1 = b[1] / b[2]
@@ -84,17 +93,24 @@ class SRTM_Zhou2003(KineticModel):
             # ----- Get R1 -----
             # Set up the weighted linear regression model
             # based on Eq. 8 in Zhou et al.
-            X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
-            y = np.mat(TAC).T
-            b = solve(X.T * W * X, X.T * W * y)
-            residual = y - X * b
-            noiseVar_eqR1 = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
+            #X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
+            X = np.column_stack((self.refTAC,intrefTAC,-intTAC))
+            #y = np.mat(TAC).T
+            y = TAC
+            #b = solve(X.T * W * X, X.T * W * y)
+            b = solve(X.T @ W @ X, X.T @ W @ y)
+            #residual = y - X * b
+            residual = y - X @ b
+            #noiseVar_eqR1 = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
+            # unbiased estimator of noise variance
+            noiseVar_eqR1 = residual.T @ W @ residual / (n-m)
 
             R1 = b[0]
             k2 = b[1]
             k2a = b[2]
 
-            self.results['BP'][k] = BP # distinguish between BP estimated using smoothed v. unsmoothed TAC?
+            self.results['BP'][k] = BP
+            self.results['DVR'][k] = DVR
             self.results['R1'][k] = R1
             self.results['k2'][k] = k2
             self.results['k2a'][k] = k2a
@@ -105,10 +121,16 @@ class SRTM_Zhou2003(KineticModel):
         return self
 
     def refine_R1(self, smoothR1, smoothk2, smoothk2a, h):
-        # Ridge regression to get better R1, k2, k2a estimates
-        #
-        # (smoothR1, smoothk2, smoothk2a) are the values to drive the estimates toward
-        # h is the diagonal elements of the matrix used to compute the weighted norm
+        '''
+        Ridge regression to get better R1, k2, k2a estimates
+
+        Args:
+            smoothR1 (float): R1 value to drive the estimate toward
+            smoothk2 (float): k2 value to drive the estimate toward
+            smoothk2a (float): k2a value to drive the estimate toward
+            h (numpy.ndarray): 1-D array consisting of the  diagonal elements
+                               of the matrix used to compute the weighted norm
+        '''
 
         if not smoothR1.ndim==smoothk2.ndim==smoothk2a.ndim==1:
             raise ValueError('smoothR1, smoothk2, smoothk2a must be 1-D')
@@ -132,11 +154,15 @@ class SRTM_Zhou2003(KineticModel):
             # ----- Get R1 incorporating spatial constraint -----
             # Set up the ridge regression model
             # based on Eq. 11 in Zhou et al.
-            X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
-            y = np.mat(TAC).T
+            #X = np.mat(np.column_stack((self.refTAC,intrefTAC,-intTAC)))
+            X = np.column_stack((self.refTAC,intrefTAC,-intTAC))
+            #y = np.mat(TAC).T
+            y = TAC
             H = mat.diag(h[k,:])
-            b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) ).T
-            b = solve(X.T * W * X + H, X.T * W * y + H * b_sc)
+            #b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) ).T
+            b_sc = np.array((smoothR1[k],smoothk2[k],smoothk2a[k])) #.reshape(-1,1)
+            #b = solve(X.T * W * X + H, X.T * W * y + H * b_sc)
+            b = solve(X.T @ W @ X + H, X.T @ W @ y + H @ b_sc)
 
             R1_lrsc = b[0]
             k2_lrsc = b[1]
@@ -151,10 +177,11 @@ class SRTM_Zhou2003(KineticModel):
 class SRTM_Lammertsma1996(KineticModel):
     '''
     Compute binding potential (BP) and relative delivery (R1) kinetic parameters
-    from dynamic PET data based on simplified reference tissue model (SRTM).
+    from dynamic PET data based on a simplified reference tissue model (SRTM).
+
     Reference:
-    Simplified reference tissue model for PET receptor studies.Lammertsma AA1,
-    Hume SP. Neuroimage. 1996 Dec;4(3 Pt 1):153-8.
+    Lammertsma AA, Hume SP. Simplified reference tissue model for PET receptor
+    studies. NeuroImage. 1996 Dec;4(3 Pt 1):153-8.
     '''
 
     # This class will compute the following results:
@@ -171,22 +198,29 @@ class SRTM_Lammertsma1996(KineticModel):
             '''
             Wrapper to construct the SRTM TAC estimation function with a given
             startActivity.
-            Args
-            ----
-                startActivity : determines initial condition for integration.
-                                See integrate in kineticmodel.py
+
+            Args:
+                startActivity (str): determines initial condition for integration.
+                                     See integrate in kineticmodel.py
+
+            Returns:
+                srtm_est (function): function to compute fitted TAC given t,
+                                     refTAC, BP, R1, k2
             '''
 
             def srtm_est(X, BPnd, R1, k2):
                 '''
                 Compute fitted TAC given t, refTAC, BP, R1, k2.
 
-                Args
-                ----
-                    X : tuple where first element is t, and second element is intrefTAC
-                    BPnd : binding potential
-                    R1 : R1
-                    k2 : k2
+                Args:
+                    X (tuple): first element is t, second element is intrefTAC
+                    BPnd (float): binding potential
+                    R1 (float): R1
+                    k2 (float): k2
+
+                Returns:
+                    TAC_est (numpy.ndarray): 1-D array
+                                             estimated time activity curve
                 '''
                 t, refTAC = X
 
@@ -216,40 +250,62 @@ class SRTM_Lammertsma1996(KineticModel):
                 return np.sum(w * np.square(TAC - srtm_fun(X, *kineticparams)))
 
             minimizer_kwargs = dict(method="L-BFGS-B",
-                                    bounds=[(0,BP_upper), (0, R1_upper), (0, k2_upper)])
-            res = basinhopping(energy_fun, x0=np.array([1.,1.,0.1]), minimizer_kwargs=minimizer_kwargs)
+                                    bounds=[(0,BP_upper),
+                                            (0, R1_upper),
+                                            (0, k2_upper)])
+            res = basinhopping(energy_fun, x0=np.array([1.,1.,0.1]),
+                               minimizer_kwargs=minimizer_kwargs)
 
-            self.results['BP'][k], self.results['R1'][k], self.results['k2'][k] = res.x
+            self.results['BP'][k], \
+            self.results['R1'][k], \
+            self.results['k2'][k] = res.x
 
         return self
 
 class SRTM_Gunn1997(KineticModel):
+    '''
+    Compute binding potential (BP) and relative delivery (R1) kinetic parameters
+    from dynamic PET data based on a simplified reference tissue model (SRTM).
+
+    Reference:
+    Roger N. Gunn, Adriaan A. Lammertsma, Susan P. Hume, and Vincent J.
+    Cunningham. Parametric imaging of ligand-receptor binding in PET using a
+    simplified reference region model. NeuroImage 6, 279-287 (1997).
+    '''
     result_names = ['BP','R1','k2']
 
     def fit(self):
-        print(self.TAC.shape)
+        #print(self.TAC.shape)
         for k, TAC in enumerate(self.TAC):
             W = mat.diag(self.weights[k,:])
-            y = np.mat(TAC).T
+            #y = np.mat(TAC).T
+            y = TAC
 
             def energy_fun(theta3):
                 exp_theta3_t = np.exp(np.asscalar(theta3)*self.t)
                 integrant = self.refTAC * exp_theta3_t
                 conv = km_integrate(integrant,self.t,self.startActivity) / exp_theta3_t
-                X = np.mat(np.column_stack((self.refTAC, conv)))
-                thetas = solve(X.T * W * X, X.T * W * y)
-                residual = y - X * thetas
-                rss = residual.T * W * residual
+                #X = np.mat(np.column_stack((self.refTAC, conv)))
+                X = np.column_stack((self.refTAC, conv))
+                #thetas = solve(X.T * W * X, X.T * W * y)
+                thetas = solve(X.T @ W @ X, X.T @ W @ y)
+                #residual = y - X * thetas
+                residual = y - X @ thetas
+                #rss = residual.T * W * residual
+                rss = residual.T @ W @ residual
                 return rss
 
-            res = minimize_scalar(energy_fun, bounds=(0.06, 0.6), method='bounded', options=dict(xatol=1e-1))
+            res = minimize_scalar(energy_fun, bounds=(0.06, 0.6),
+                                  method='bounded', options=dict(xatol=1e-1))
             theta3 = np.asscalar(res.x)
 
             exp_theta3_t = np.exp(theta3*self.t)
             integrant = self.refTAC * exp_theta3_t
             conv = km_integrate(integrant,self.t,self.startActivity) / exp_theta3_t
-            X = np.mat(np.column_stack((self.refTAC, conv)))
-            thetas = solve(X.T * W * X, X.T * W * y)
+            #X = np.mat(np.column_stack((self.refTAC, conv)))
+            X = np.column_stack((self.refTAC, conv))
+            #thetas = solve(X.T * W * X, X.T * W * y)
+            thetas = solve(X.T @ W @ X, X.T @ W @ y)
 
             R1 = thetas[0]
             k2 = thetas[1] + R1*theta3

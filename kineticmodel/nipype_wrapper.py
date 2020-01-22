@@ -6,28 +6,41 @@ from nipype.utils.filemanip import split_filename
 from nipype.interfaces.io import add_traits
 
 from temporalimage import load as ti_load
+from temporalimage import Quantity
 import kineticmodel
 
 class KineticModelInputSpec(BaseInterfaceInputSpec):
-    model = traits.Enum('SRTM_Zhou2003','SRTM_Lammertsma1996',
-                        desc='one of: SRTM_Zhou2003, SRTM_Lammertsma1996',
-                        mandatory=True)
-    timeSeriesImgFile = File(exists=True, desc='Dynamic PET image', mandatory=True)
-    frameTimingCsvFile = File(exists=True, desc='csv file listing the duration of each time frame in the 4D image, in minutes', mandatory=True)
-    refRegionMaskFile = File(exists=True, desc='Reference region mask', mandatory=True)
-    startTime = traits.Float(0.0, desc='minute into the time series image at which to start computing the parametric images, inclusive', mandatory=False)
-    endTime = traits.Float(desc='minute into the time series image at which to stop computing the parametric images, exclusive', mandatory=False)
+    model = traits.Enum(*kineticmodel.KineticModel.model_values, mandatory=True,
+                        desc='one of: ' + \
+                             ', '.join(kineticmodel.KineticModel.model_values))
+    timeSeriesImgFile = File(exists=True, mandatory=True,
+                             desc='path to dynamic PET image')
+    frameTimingFile = File(exists=True, mandatory=True,
+                              desc=('csv/sif/json file listing the duration of '
+                                    'each time frame in the 4D image'))
+    refRegionMaskFile = File(exists=True, mandatory=True,
+                             desc='Reference region mask')
+    startTime = traits.Float(0.0, mandatory=False,
+                             desc=('minute into the time series image at which '
+                         'to start computing the parametric images, inclusive'))
+    endTime = traits.Float(mandatory=False,
+                           desc=('minute into the time series image at which '
+                          'to stop computing the parametric images, exclusive'))
 
-    time_unit = traits.Enum('min','s', desc='one of: min, s', mandatory=True)
-    startActivity = traits.Enum('flat','increasing','zero', desc='one of: flat, increasing, zero', mandatory=True)
-    weights = traits.Enum('frameduration','none','frameduration_activity','frameduration_activity_decay','trues',
-                          desc='frameduration, none, frameduration_activity, frameduration_activity_decay, trues',
+    startActivity = traits.Enum(*kineticmodel.KineticModel.startActivity_values,
+                                mandatory=True,
+                                desc='one of: ' + \
+                      ', '.join(kineticmodel.KineticModel.startActivity_values))
+    weights = traits.Enum(*kineticmodel.KineticModel.weights_values,
+                          desc='one of: ' + \
+                          ', '.join(kineticmodel.KineticModel.weights_values),
                           mandatory=True)
-    halflife = traits.Float(desc='Halflife of the radiotracer. Must be provided in time_unit units (required for decay corrected weights)',
-                            mandatory=False)
-    #Trues = traits.array(desc="", mandatory=False)
-    fwhm = traits.Float(desc='Full width at half max (in mm) for Gaussian smoothing (required for SRTM_Zhou2003)',
-                        mandatory=False)
+    halflife = traits.Float(mandatory=False,
+                            desc=('halflife of the radiotracer, in minutes '
+                                  '(required for decay corrected weights)'))
+    fwhm = traits.Float(mandatory=False,
+                        desc=('Full width at half max (in mm) for Gaussian '
+                              'smoothing (required for SRTM_Zhou2003)'))
 
 class KineticModel(BaseInterface):
     """
@@ -43,23 +56,23 @@ class KineticModel(BaseInterface):
         model = self.inputs.model
         timeSeriesImgFile = self.inputs.timeSeriesImgFile
         refRegionMaskFile = self.inputs.refRegionMaskFile
-        frameTimingCsvFile = self.inputs.frameTimingCsvFile
+        frameTimingFile = self.inputs.frameTimingFile
         endTime = self.inputs.endTime
 
-        ti = ti_load(timeSeriesImgFile, frameTimingCsvFile)
+        ti = ti_load(timeSeriesImgFile, frameTimingFile)
 
         if isdefined(self.inputs.startTime):
-            startTime = self.inputs.startTime
+            startTime = Quantity(self.inputs.startTime, 'minute')
         else:
             startTime = ti.get_startTime()
 
         if isdefined(self.inputs.endTime):
-            endTime = self.inputs.endTime
+            endTime = Quantity(self.inputs.endTime, 'minute')
         else:
             endTime = ti.get_endTime()
 
         if isdefined(self.inputs.halflife):
-            halflife = self.inputs.halflife
+            halflife = Quantity(self.inputs.halflife, 'minute')
         else:
             halflife = None
 
@@ -77,16 +90,16 @@ class KineticModel(BaseInterface):
         class_ = getattr(kineticmodel, model)
         results_img = class_.volume_wrapper(ti=ti,
                                             refRegionMaskFile=refRegionMaskFile,
-                                            time_unit=self.inputs.time_unit,
                                             startActivity=self.inputs.startActivity,
                                             weights=self.inputs.weights,
                                             halflife=halflife,
-                                            #Trues=self.inputs.Trues,
                                             fwhm=fwhm)
 
         for result_name in class_.result_names:
-            res_img = nib.Nifti1Image(results_img[result_name], ti.affine, ti.header)
-            res_fname = base+'_'+'{:02.2f}'.format(self.modEndTime)+'min_'+result_name+'.nii.gz'
+            res_img = nib.Nifti1Image(results_img[result_name],
+                                      ti.affine, ti.header)
+            res_fname = base + '_' + '{:02.2f}'.format(self.modEndTime) + \
+                        'min_'+result_name+'.nii.gz'
             nib.save(res_img,res_fname)
 
         return runtime
@@ -107,6 +120,7 @@ class KineticModel(BaseInterface):
         class_ = getattr(kineticmodel, model)
 
         for result_name in class_.result_names:
-            outputs[result_name] = os.path.abspath(base+'_'+'{:02.2f}'.format(self.modEndTime)+'min_'+result_name+'.nii.gz')
+            outputs[result_name] = os.path.abspath(base + '_' + \
+                '{:02.2f}'.format(self.modEndTime)+'min_'+result_name+'.nii.gz')
 
         return outputs
