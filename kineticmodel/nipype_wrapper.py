@@ -226,9 +226,15 @@ class KineticModelROI(BaseInterface):
             raise ValueError("Exactly one row should correspond to the reference TAC")
 
         # separate reference region TAC from other TACs
+        # we add 1 to startIndex and endIndex because the first column in
+        # roiTACs is ROI names
         refTAC = roiTACs.iloc[isref,startIndex+1:endIndex+1].values.flatten()
         TAC = roiTACs.iloc[~isref,startIndex+1:endIndex+1].values
         TAC_rownames = TAC_rownames[~isref]
+
+        # subset time vectors
+        t = t[startIndex:endIndex]
+        dt = dt[startIndex:endIndex]
 
         class_ = getattr(kineticmodel, model)
         km = class_(t, dt, TAC, refTAC,
