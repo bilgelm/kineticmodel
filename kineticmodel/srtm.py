@@ -80,15 +80,18 @@ class SRTM_Zhou2003(KineticModel):
                 X = np.column_stack((intrefTAC, self.refTAC, -smoothTAC[k,:].flatten()))
 
             y = intTAC
-            b = solve(X.T @ W @ X, X.T @ W @ y)
-            residual = y - X @ b
-            # unbiased estimator of noise variance
-            noiseVar_eqDVR = residual.T @ W @ residual / (n-m)
+            try:
+                b = solve(X.T @ W @ X, X.T @ W @ y)
+                residual = y - X @ b
+                # unbiased estimator of noise variance
+                noiseVar_eqDVR = residual.T @ W @ residual / (n-m)
 
-            DVR = b[0]
-            #R1 = b[1] / b[2]
-            #k2 = b[0] / b[2]
-            BP = DVR - 1
+                DVR = b[0]
+                #R1 = b[1] / b[2]
+                #k2 = b[0] / b[2]
+                BP = DVR - 1
+            except:
+                DVR = BP = noiseVar_eqDVR = 0
 
             # ----- Get R1 -----
             # Set up the weighted linear regression model
@@ -97,17 +100,17 @@ class SRTM_Zhou2003(KineticModel):
             X = np.column_stack((self.refTAC,intrefTAC,-intTAC))
             #y = np.mat(TAC).T
             y = TAC
-            #b = solve(X.T * W * X, X.T * W * y)
-            b = solve(X.T @ W @ X, X.T @ W @ y)
-            #residual = y - X * b
-            residual = y - X @ b
-            #noiseVar_eqR1 = residual.T * W * residual / (n-m) # unbiased estimator of noise variance
-            # unbiased estimator of noise variance
-            noiseVar_eqR1 = residual.T @ W @ residual / (n-m)
+            try:
+                b = solve(X.T @ W @ X, X.T @ W @ y)
+                residual = y - X @ b
+                # unbiased estimator of noise variance
+                noiseVar_eqR1 = residual.T @ W @ residual / (n-m)
 
-            R1 = b[0]
-            k2 = b[1]
-            k2a = b[2]
+                R1 = b[0]
+                k2 = b[1]
+                k2a = b[2]
+            except:
+                R1 = k2 = k2a = noiseVar_eqR1 = 0
 
             self.results['BP'][k] = BP
             self.results['DVR'][k] = DVR
@@ -159,14 +162,16 @@ class SRTM_Zhou2003(KineticModel):
             #y = np.mat(TAC).T
             y = TAC
             H = mat.diag(h[k,:])
-            #b_sc = np.mat( (smoothR1[k],smoothk2[k],smoothk2a[k]) ).T
             b_sc = np.array((smoothR1[k],smoothk2[k],smoothk2a[k])) #.reshape(-1,1)
-            #b = solve(X.T * W * X + H, X.T * W * y + H * b_sc)
-            b = solve(X.T @ W @ X + H, X.T @ W @ y + H @ b_sc)
 
-            R1_lrsc = b[0]
-            k2_lrsc = b[1]
-            k2a_lrsc = b[2]
+            try:
+                b = solve(X.T @ W @ X + H, X.T @ W @ y + H @ b_sc)
+
+                R1_lrsc = b[0]
+                k2_lrsc = b[1]
+                k2a_lrsc = b[2]
+            except:
+                R1_lrsc = k2_lrsc = k2a_lrsc = 0
 
             self.results['R1_lrsc'][k] = R1_lrsc
             self.results['k2_lrsc'][k] = k2_lrsc
